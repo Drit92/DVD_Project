@@ -41,41 +41,7 @@ def download_and_extract():
     # Load the first CSV found
     return csv_files[0]
 
-# -----------------------------------------------
-# RECREATE ENGINEERED FEATURES FROM COLAB
-# -----------------------------------------------
 
-# 1. AGE_YEARS
-if "DAYS_BIRTH" in df.columns:
-    df["AGE_YEARS"] = (df["DAYS_BIRTH"].abs() // 365).astype(int)
-
-# 2. EMPLOY_YEARS
-if "DAYS_EMPLOYED" in df.columns:
-    df["EMPLOY_YEARS"] = (df["DAYS_EMPLOYED"].abs() // 365).astype(int)
-
-# 3. Fill missing numeric columns to avoid visualization errors
-df = df.fillna(0)
-
-# 4. Recreate cluster labels IF REQUIRED
-if "cluster_label" not in df.columns:
-    try:
-        from sklearn.cluster import KMeans
-
-        cluster_features = [
-            c for c in [
-                "AMT_INCOME_TOTAL", "AMT_CREDIT",
-                "AGE_YEARS", "EMPLOY_YEARS",
-                "CNT_FAM_MEMBERS"
-            ]
-            if c in df.columns
-        ]
-
-        # Avoid running if too few features
-        if len(cluster_features) >= 3:
-            kmeans = KMeans(n_clusters=4, random_state=42)
-            df["cluster_label"] = kmeans.fit_predict(df[cluster_features])
-    except:
-        pass
 
 
 # -----------------------------------------------
