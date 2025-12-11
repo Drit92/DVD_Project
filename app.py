@@ -186,9 +186,9 @@ with col1:
             color_discrete_sequence=PLOTLY_COLORS,
             hover_data=["AGE_YEARS", "CREDIT_INCOME_RATIO", "INCOME_PER_PERSON"],
             opacity=0.7,
-            trendline="ols",
             title="Income vs Credit Amount",
         )
+
         fig1.update_traces(marker=dict(size=6, line=dict(width=0)))
         fig1.update_layout(legend_title_text="Age bucket")
         st.plotly_chart(fig1, use_container_width=True)
