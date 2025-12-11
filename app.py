@@ -1,6 +1,5 @@
 import os
 import zipfile
-
 import gdown
 import numpy as np
 import pandas as pd
@@ -8,28 +7,24 @@ import plotly.express as px
 import streamlit as st
 
 
-# --------------------------------------------------------------------
+# ============================================================
 # CONFIG
-# --------------------------------------------------------------------
+# ============================================================
 DATA_ID = "1FSSkKQOJtvOpP1I1qyr4x6SYQg-kBnVw"   # Google Drive file ID
 ZIP_PATH = "dataset.zip"
 EXTRACT_DIR = "file_zip"
 
 st.set_page_config(page_title="Loan Applicant Insights Dashboard", layout="wide")
 st.title("📊 Loan Applicant Visual Insights Dashboard")
-st.markdown(
-    "Interactive views of urban loan applicants to explore income, age, credit, and risk segments."
-)
 
 
-# --------------------------------------------------------------------
-# Download & extract ZIP, return path to first CSV
-# --------------------------------------------------------------------
+# ============================================================
+# Download & Extract ZIP
+# ============================================================
 @st.cache_data(show_spinner=True)
 def download_and_extract():
     os.makedirs(EXTRACT_DIR, exist_ok=True)
 
-    # Download only if ZIP is not present
     if not os.path.exists(ZIP_PATH):
         gdown.download(id=DATA_ID, output=ZIP_PATH, quiet=False)
 
@@ -37,7 +32,7 @@ def download_and_extract():
     with zipfile.ZipFile(ZIP_PATH, "r") as zip_ref:
         zip_ref.extractall(EXTRACT_DIR)
 
-    # Find first CSV recursively
+    # Recursive search for CSV
     for root, dirs, files in os.walk(EXTRACT_DIR):
         for f in files:
             if f.lower().endswith(".csv"):
@@ -46,157 +41,151 @@ def download_and_extract():
     return None
 
 
-# --------------------------------------------------------------------
-# Load + feature engineering in a single cached function
-# --------------------------------------------------------------------
+# ============================================================
+# Load Data + Apply EXACT Colab Feature Engineering
+# ============================================================
 @st.cache_data(show_spinner=True)
 def load_and_prepare_data():
     csv_path = download_and_extract()
     if csv_path is None:
-        raise FileNotFoundError("No CSV file found inside the ZIP.")
+        raise FileNotFoundError("❌ No CSV found inside ZIP!")
 
     df = pd.read_csv(csv_path)
 
-    # 1) AGE_YEARS  (from Colab logic)
+    # ==================================================================
+    # 1. AGE_YEARS — EXACT from Colab
+    # ==================================================================
     if "DAYS_BIRTH" in df.columns:
         df["AGE_YEARS"] = (df["DAYS_BIRTH"] / -365).round(1)
     else:
-        # fallback so the app does not crash even if not present
         df["AGE_YEARS"] = np.nan
 
-    # 2) EMP_YEARS
+    # ==================================================================
+    # 2. EMP_YEARS — EXACT from Colab (plus anomaly fixing)
+    # ==================================================================
     if "DAYS_EMPLOYED" in df.columns:
         df["EMP_YEARS"] = (df["DAYS_EMPLOYED"] / -365).round(1)
-        # Replace nonsense values (people with 1000 years employment)
         df.loc[df["EMP_YEARS"] > 60, "EMP_YEARS"] = np.nan
     else:
         df["EMP_YEARS"] = np.nan
 
-    # 3) Financial ratios
-    if {"AMT_CREDIT", "AMT_INCOME_TOTAL"}.issubset(df.columns):
-        df["CREDIT_INCOME_RATIO"] = df["AMT_CREDIT"] / df["AMT_INCOME_TOTAL"]
-    else:
-        df["CREDIT_INCOME_RATIO"] = np.nan
+    # ==================================================================
+    # 3. Financial Ratios — EXACT from Colab
+    # ==================================================================
+    # Avoid division by zero
+    income = df["AMT_INCOME_TOTAL"].replace(0, np.nan)
 
-    if {"AMT_ANNUITY", "AMT_INCOME_TOTAL"}.issubset(df.columns):
-        df["ANNUITY_INCOME_RATIO"] = df["AMT_ANNUITY"] / df["AMT_INCOME_TOTAL"]
-    else:
-        df["ANNUITY_INCOME_RATIO"] = np.nan
+    df["CREDIT_INCOME_RATIO"] = df["AMT_CREDIT"] / income
+    df["ANNUITY_INCOME_RATIO"] = df["AMT_ANNUITY"] / income
 
-    if {"AMT_INCOME_TOTAL", "CNT_FAM_MEMBERS"}.issubset(df.columns):
-        df["INCOME_PER_PERSON"] = df["AMT_INCOME_TOTAL"] / df["CNT_FAM_MEMBERS"]
-    else:
-        df["INCOME_PER_PERSON"] = np.nan
+    df["INCOME_PER_PERSON"] = df["AMT_INCOME_TOTAL"] / df["CNT_FAM_MEMBERS"].replace(0, np.nan)
 
-    # Basic NA handling for visuals
+    # Clean inf values
+    df.replace([np.inf, -np.inf], np.nan, inplace=True)
+
     df = df.copy()
     return df
 
 
-# --------------------------------------------------------------------
-# MAIN
-# --------------------------------------------------------------------
+# ============================================================
+# MAIN APP
+# ============================================================
 try:
     df = load_and_prepare_data()
 except Exception as e:
     st.error(f"❌ Failed to load data: {e}")
     st.stop()
 
-# Ensure AGE_YEARS exists and is numeric
-if "AGE_YEARS" not in df.columns:
-    st.error("AGE_YEARS column could not be created. Check source data.")
-    st.stop()
+st.success("Dataset loaded and processed successfully!")
 
-# ---- Sidebar filters ------------------------------------------------
+# ============================================================
+# Sidebar Filters
+# ============================================================
 st.sidebar.header("Filters")
 
-# Income range (guard against non-positive / missing values)
-if "AMT_INCOME_TOTAL" in df.columns:
-    income_min = float(df["AMT_INCOME_TOTAL"].min())
-    income_max = float(df["AMT_INCOME_TOTAL"].max())
-else:
-    income_min, income_max = 0.0, 0.0
+# Income slider
+income_min = float(df["AMT_INCOME_TOTAL"].min())
+income_max = float(df["AMT_INCOME_TOTAL"].max())
 
 income_slider = st.sidebar.slider(
-    "Annual Income Range",
-    float(income_min),
-    float(income_max),
-    (float(income_min), float(income_max)),
+    "Annual Income (USD)",
+    income_min,
+    income_max,
+    (income_min, income_max),
     step=1000.0,
 )
 
-# Age range: drop NaNs to get valid bounds
+# Age slider
 age_series = df["AGE_YEARS"].dropna()
-if len(age_series) > 0:
-    age_min = int(age_series.min())
-    age_max = int(age_series.max())
-else:
-    age_min, age_max = 18, 70  # fallback
+age_min = int(age_series.min()) if len(age_series) else 18
+age_max = int(age_series.max()) if len(age_series) else 70
 
 age_slider = st.sidebar.slider(
-    "Age Range (years)",
-    int(age_min),
-    int(age_max),
-    (int(age_min), int(age_max)),
+    "Age (years)",
+    age_min,
+    age_max,
+    (age_min, age_max)
 )
 
-# Apply filters safely
+# Apply filters
 df_filtered = df[
-    (df["AMT_INCOME_TOTAL"].between(income_slider[0], income_slider[1]))
-    & (df["AGE_YEARS"].between(age_slider[0], age_slider[1]))
+    (df["AMT_INCOME_TOTAL"].between(income_slider[0], income_slider[1])) &
+    (df["AGE_YEARS"].between(age_slider[0], age_slider[1], inclusive="both"))
 ]
 
-st.caption(
-    f"Showing {len(df_filtered):,} applicants after filters "
-    f"(out of {len(df):,} total)."
+st.caption(f"Showing **{len(df_filtered):,}** applicants (out of {len(df):,}).")
+
+# ============================================================
+# Data Preview
+# ============================================================
+st.subheader("🔍 Data Preview")
+st.dataframe(df_filtered.head(), use_container_width=True)
+
+# ============================================================
+# VISUALS
+# ============================================================
+
+# --------------------- 1) Income vs Credit ---------------------
+st.subheader("💰 Income vs Credit Amount")
+fig1 = px.scatter(
+    df_filtered,
+    x="AMT_INCOME_TOTAL",
+    y="AMT_CREDIT",
+    opacity=0.6,
+    trendline="ols",
+    labels={"AMT_INCOME_TOTAL": "Income", "AMT_CREDIT": "Credit Amount"},
 )
+st.plotly_chart(fig1, use_container_width=True)
 
-# --------------------------------------------------------------------
-# Data preview
-# --------------------------------------------------------------------
-st.subheader("🔎 Data Preview")
-st.dataframe(df_filtered.head())
 
-# --------------------------------------------------------------------
-# Visuals
-# --------------------------------------------------------------------
-col1, col2 = st.columns(2)
+# --------------------- 2) Age Distribution ---------------------
+st.subheader("📈 Age Distribution (Years)")
+fig2 = px.histogram(
+    df_filtered,
+    x="AGE_YEARS",
+    nbins=40,
+    labels={"AGE_YEARS": "Age (Years)"},
+)
+st.plotly_chart(fig2, use_container_width=True)
 
-with col1:
-    st.subheader("💰 Income vs Credit")
-    if {"AMT_INCOME_TOTAL", "AMT_CREDIT"}.issubset(df_filtered.columns):
-        fig1 = px.scatter(
-            df_filtered,
-            x="AMT_INCOME_TOTAL",
-            y="AMT_CREDIT",
-            opacity=0.6,
-            title="Income vs Credit Amount",
-        )
-        st.plotly_chart(fig1, use_container_width=True)
-    else:
-        st.info("Income or credit columns are missing.")
 
-with col2:
-    st.subheader("📈 Age Distribution")
-    if "AGE_YEARS" in df_filtered.columns:
-        fig2 = px.histogram(
-            df_filtered,
-            x="AGE_YEARS",
-            nbins=40,
-            title="Distribution of Applicant Age (Years)",
-        )
-        st.plotly_chart(fig2, use_container_width=True)
-    else:
-        st.info("AGE_YEARS column is missing.")
-
+# ----------------- 3) Credit-to-Income Ratio -------------------
 st.subheader("📊 Credit-to-Income Ratio")
-if "CREDIT_INCOME_RATIO" in df_filtered.columns:
-    fig3 = px.histogram(
-        df_filtered,
-        x="CREDIT_INCOME_RATIO",
-        nbins=40,
-        title="Distribution of Credit-to-Income Ratio",
-    )
-    st.plotly_chart(fig3, use_container_width=True)
-else:
-    st.info("CREDIT_INCOME_RATIO is not available.")
+fig3 = px.histogram(
+    df_filtered,
+    x="CREDIT_INCOME_RATIO",
+    nbins=40,
+    labels={"CREDIT_INCOME_RATIO": "Credit / Income"},
+)
+st.plotly_chart(fig3, use_container_width=True)
+
+
+# ----------------- 4) Income Per Person -------------------
+st.subheader("👨‍👩‍👧 Income Per Family Member")
+fig4 = px.histogram(
+    df_filtered,
+    x="INCOME_PER_PERSON",
+    nbins=40,
+    labels={"INCOME_PER_PERSON": "Income Per Person"},
+)
+st.plotly_chart(fig4, use_container_width=True)
