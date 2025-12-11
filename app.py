@@ -15,10 +15,10 @@ ZIP_PATH = "dataset.zip"
 EXTRACT_DIR = "file_zip"
 
 def download_and_extract():
-    if not os.path.exists(EXTRACT_DIR):
-        os.makedirs(EXTRACT_DIR, exist_ok=True)
+    # Create extract dir
+    os.makedirs(EXTRACT_DIR, exist_ok=True)
 
-    # Only download if not already downloaded
+    # Download if needed
     if not os.path.exists(ZIP_PATH):
         st.info("📥 Downloading dataset from Google Drive...")
         gdown.download(id=DATA_ID, output=ZIP_PATH, quiet=False)
@@ -27,14 +27,20 @@ def download_and_extract():
     with zipfile.ZipFile(ZIP_PATH, "r") as zip_ref:
         zip_ref.extractall(EXTRACT_DIR)
 
-    # Auto-detect CSV inside folder
-    csv_files = [f for f in os.listdir(EXTRACT_DIR) if f.endswith(".csv")]
+    # Recursively search for CSV files
+    csv_files = []
+    for root, dirs, files in os.walk(EXTRACT_DIR):
+        for f in files:
+            if f.endswith(".csv"):
+                csv_files.append(os.path.join(root, f))
 
     if not csv_files:
-        st.error("No CSV file found inside the ZIP.")
+        st.error("❌ No CSV file found inside the extracted ZIP folder.")
         return None
+    
+    # Load the first CSV found
+    return csv_files[0]
 
-    return os.path.join(EXTRACT_DIR, csv_files[0])
 
 
 # -----------------------------------------------
