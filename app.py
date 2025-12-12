@@ -665,53 +665,56 @@ radar_cols = [
     "AGE_YEARS",
     "AMT_INCOME_TOTAL",
 ]
+
 if set(radar_cols).issubset(df_filtered.columns):
     radar_data = (
         df_filtered.groupby("TARGET")[radar_cols]
         .mean()
         .T
     )
+
     radar_norm = radar_data.apply(
         lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9),
         axis=1,
     )
 
     labels = radar_norm.index.tolist()
-    angles = np.linspace(0, 2 * math.pi, len(labels), endpoint=False).tolist()
-    angles += angles[:1]
 
     vals0 = radar_norm.get(0, pd.Series([0] * len(labels), index=labels)).tolist()
     vals1 = radar_norm.get(1, pd.Series([0] * len(labels), index=labels)).tolist()
-    vals0 += vals0[:1]
-    vals1 += vals1[:1]
 
-    # Plotly radar via polar line plots
+    # first trace via px.line_polar, with line_close=True
     fig_radar = px.line_polar(
         r=vals0,
-        theta=labels + [labels[0]],
+        theta=labels,
         line_close=True,
         color_discrete_sequence=["green"],
     )
     fig_radar.data[0].name = "Non-defaulters"
+
+    # second trace via add_scatterpolar (also closed by repeating first r)
+    vals1_closed = vals1 + [vals1[0]]
+    theta_closed = labels + [labels[0]]
+
     fig_radar.add_scatterpolar(
-        r=vals1,
-        theta=labels + [labels[0]],
-        line_close=True,
+        r=vals1_closed,
+        theta=theta_closed,
         mode="lines",
-        line_color="red",
         name="Defaulters",
+        line=dict(color="red"),
+        fill="toself",
+        opacity=0.4,
     )
-    fig_radar.update_traces(fill="toself", opacity=0.4)
+
+    # fill first trace as well
+    fig_radar.update_traces(fill="toself", opacity=0.4, selector=dict(name="Non-defaulters"))
+
     fig_radar.update_layout(
         title="Risk profile comparison – defaulters vs non-defaulters",
         showlegend=True,
     )
-    st.plotly_chart(fig_radar, width="stretch")
 
-    st.markdown(
-        "- **Non-defaulters** have lower credit and EMI burden, higher age/income, and stronger external scores.\n"
-        "- **Defaulters** show **higher financial stress, more refusals, and weaker scores**, forming a clearly riskier profile."
-    )
+    st.plotly_chart(fig_radar, use_container_width=True)
 else:
     st.info("Not all radar features are present in clean dataset.")
 
