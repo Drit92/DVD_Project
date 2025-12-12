@@ -669,31 +669,39 @@ radar_cols = [
 ]
 
 if set(radar_cols).issubset(df_filtered.columns):
+
+    # 1) Mean values by TARGET, like in Colab
     radar_data = (
         df_filtered.groupby("TARGET")[radar_cols]
         .mean()
         .T
-    )
+    )  # rows = features, cols = 0/1
 
-    radar_norm = radar_data.apply(
-        lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9),
-        axis=1,
-    )
+    # 2) Scale each feature to 0–1 across BOTH groups together,
+    #    but keep the actual ratios, not hard 0/1.
+    #    This avoids the pure triangles.
+    def minmax_two_groups(row):
+        mn = row.min()
+        mx = row.max()
+        if mx - mn < 1e-9:
+            return pd.Series([0.5, 0.5], index=row.index)  # flat feature
+        return (row - mn) / (mx - mn)
+
+    radar_norm = radar_data.apply(minmax_two_groups, axis=1)
 
     labels = radar_norm.index.tolist()
-    # close the loop
     labels_closed = labels + [labels[0]]
 
-    vals0 = radar_norm.get(0, pd.Series([0] * len(labels), index=labels)).tolist()
-    vals1 = radar_norm.get(1, pd.Series([0] * len(labels), index=labels)).tolist()
-    vals0_closed = vals0 + [vals0[0]]
-    vals1_closed = vals1 + [vals1[0]]
+    vals_non = radar_norm[0].tolist()
+    vals_def = radar_norm[1].tolist()
+    vals_non_closed = vals_non + [vals_non[0]]
+    vals_def_closed = vals_def + [vals_def[0]]
 
     fig_radar = go.Figure()
 
     fig_radar.add_trace(
         go.Scatterpolar(
-            r=vals0_closed,
+            r=vals_non_closed,
             theta=labels_closed,
             name="Non-defaulters",
             line=dict(color="green"),
@@ -704,7 +712,7 @@ if set(radar_cols).issubset(df_filtered.columns):
 
     fig_radar.add_trace(
         go.Scatterpolar(
-            r=vals1_closed,
+            r=vals_def_closed,
             theta=labels_closed,
             name="Defaulters",
             line=dict(color="red"),
@@ -722,6 +730,7 @@ if set(radar_cols).issubset(df_filtered.columns):
     st.plotly_chart(fig_radar, use_container_width=True)
 else:
     st.info("Not all radar features are present in clean dataset.")
+
 
 
 st.markdown('</div>', unsafe_allow_html=True)
