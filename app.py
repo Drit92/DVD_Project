@@ -655,6 +655,8 @@ else:
     st.info("RISK_SCORE not found in clean dataset.")
 
 # Radar chart: defaulters vs non-defaulters
+import plotly.graph_objects as go
+
 st.subheader("Radar: risk profile – defaulters vs non-defaulters")
 
 radar_cols = [
@@ -679,43 +681,47 @@ if set(radar_cols).issubset(df_filtered.columns):
     )
 
     labels = radar_norm.index.tolist()
+    # close the loop
+    labels_closed = labels + [labels[0]]
 
     vals0 = radar_norm.get(0, pd.Series([0] * len(labels), index=labels)).tolist()
     vals1 = radar_norm.get(1, pd.Series([0] * len(labels), index=labels)).tolist()
-
-    # first trace via px.line_polar, with line_close=True
-    fig_radar = px.line_polar(
-        r=vals0,
-        theta=labels,
-        line_close=True,
-        color_discrete_sequence=["green"],
-    )
-    fig_radar.data[0].name = "Non-defaulters"
-
-    # second trace via add_scatterpolar (also closed by repeating first r)
+    vals0_closed = vals0 + [vals0[0]]
     vals1_closed = vals1 + [vals1[0]]
-    theta_closed = labels + [labels[0]]
 
-    fig_radar.add_scatterpolar(
-        r=vals1_closed,
-        theta=theta_closed,
-        mode="lines",
-        name="Defaulters",
-        line=dict(color="red"),
-        fill="toself",
-        opacity=0.4,
+    fig_radar = go.Figure()
+
+    fig_radar.add_trace(
+        go.Scatterpolar(
+            r=vals0_closed,
+            theta=labels_closed,
+            name="Non-defaulters",
+            line=dict(color="green"),
+            fill="toself",
+            opacity=0.4,
+        )
     )
 
-    # fill first trace as well
-    fig_radar.update_traces(fill="toself", opacity=0.4, selector=dict(name="Non-defaulters"))
+    fig_radar.add_trace(
+        go.Scatterpolar(
+            r=vals1_closed,
+            theta=labels_closed,
+            name="Defaulters",
+            line=dict(color="red"),
+            fill="toself",
+            opacity=0.4,
+        )
+    )
 
     fig_radar.update_layout(
         title="Risk profile comparison – defaulters vs non-defaulters",
         showlegend=True,
+        polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
     )
 
     st.plotly_chart(fig_radar, use_container_width=True)
 else:
     st.info("Not all radar features are present in clean dataset.")
+
 
 st.markdown('</div>', unsafe_allow_html=True)
