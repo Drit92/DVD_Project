@@ -1,243 +1,47 @@
-import os
-import zipfile
-
-import gdown
-import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.io as pio
 import streamlit as st
 
-# --------------------------------------------------------------------
+# ----------------------------------------------------
 # CONFIG
-# --------------------------------------------------------------------
-DATA_ID = "1FSSkKQOJtvOpP1I1qyr4x6SYQg-kBnVw"   # Google Drive ZIP ID
-ZIP_PATH = "dataset.zip"
-EXTRACT_DIR = "file_zip"
-
-# Plotly template and color palette
+# ----------------------------------------------------
 pio.templates.default = "plotly_white"
 PLOTLY_COLORS = ["#004c6d", "#00a1c6", "#f29f05", "#e03b8b"]
 
 st.set_page_config(page_title="Loan Applicant Risk Insights", layout="wide")
 st.title("📊 Loan Applicant Risk Insights Dashboard")
 st.markdown(
-    "Focused visual insights to help the credit team identify safe segments, watchlist groups, "
-    "and red-flag borrowers based on financial stress, behaviour, and external scores."
+    "Visual risk signals to help the credit team identify **safe segments**, "
+    "**watchlist profiles**, and **red-flag borrowers**."
 )
 
-# --------------------------------------------------------------------
-# Download & extract ZIP, return base folder containing both CSVs
-# --------------------------------------------------------------------
+# ----------------------------------------------------
+# DATA LOADING
+# ----------------------------------------------------
 @st.cache_data(show_spinner=True)
-def download_and_extract() -> str:
-    os.makedirs(EXTRACT_DIR, exist_ok=True)
-
-    if not os.path.exists(ZIP_PATH):
-        gdown.download(id=DATA_ID, output=ZIP_PATH, quiet=False)
-
-    with zipfile.ZipFile(ZIP_PATH, "r") as zip_ref:
-        zip_ref.extractall(EXTRACT_DIR)
-
-    base_dir = None
-    for root, dirs, files in os.walk(EXTRACT_DIR):
-        if "application_data.csv" in files and "previous_application.csv" in files:
-            base_dir = root
-            break
-
-    if base_dir is None:
-        raise FileNotFoundError(
-            "Could not find application_data.csv and previous_application.csv inside the ZIP."
-        )
-
-    return base_dir
-
-# --------------------------------------------------------------------
-# Load + feature engineering with sampling
-# --------------------------------------------------------------------
-@st.cache_data(show_spinner=True)
-def load_and_prepare_data(sample_n: int | None = 60_000) -> pd.DataFrame:
+def load_clean_data(sample_n: int | None = 100_000) -> pd.DataFrame:
     """
-    Load application_data and previous_application, optionally sample rows
-    from application_data, and recreate the main engineered & behavioural
-    features from the notebook. Returns a compact analytical dataset.
+    Load pre-engineered analytical dataset created in Colab:
+    clean_loan_risk.csv.gz at repo root.
+
+    Optionally sample rows to keep rendering light.
     """
-    base_dir = download_and_extract()
-    app_path = os.path.join(base_dir, "application_data.csv")
-    prev_path = os.path.join(base_dir, "previous_application.csv")
+    df = pd.read_csv("clean_loan_risk.csv.gz", compression="gzip")
+    if sample_n is not None and len(df) > sample_n:
+        df = df.sample(sample_n, random_state=42)
+    return df
 
-    app_data = pd.read_csv(app_path)
-    prev_data = pd.read_csv(prev_path)
+df = load_clean_data()
 
-    # Downsample to keep memory & plotting manageable
-    if sample_n is not None and len(app_data) > sample_n:
-        app_data = app_data.sample(sample_n, random_state=42)
-
-    # ---------------------------
-    # 1) Demographic & ratios
-    # ---------------------------
-    if "DAYS_BIRTH" in app_data.columns:
-        app_data["AGE_YEARS"] = (app_data["DAYS_BIRTH"] / -365).round(1)
-
-    if "DAYS_EMPLOYED" in app_data.columns:
-        emp = app_data["DAYS_EMPLOYED"].replace(365243, np.nan)
-        app_data["EMP_YEARS"] = (-emp / 365).clip(lower=0, upper=40)
-
-    app_data["CREDIT_INCOME_RATIO"] = app_data["AMT_CREDIT"] / app_data["AMT_INCOME_TOTAL"]
-    app_data["ANNUITY_INCOME_RATIO"] = app_data["AMT_ANNUITY"] / app_data["AMT_INCOME_TOTAL"]
-    app_data["INCOME_PER_PERSON"] = app_data["AMT_INCOME_TOTAL"] / app_data["CNT_FAM_MEMBERS"]
-
-    # ---------------------------
-    # 2) Behavioural features from previous_application
-    # ---------------------------
-    refusal_flag = (
-        prev_data.groupby("SK_ID_CURR")["NAME_CONTRACT_STATUS"]
-        .apply(lambda x: (x == "Refused").any())
-        .astype(int)
-        .rename("FLAG_EVER_REFUSED")
-    )
-
-    prev_app_count = (
-        prev_data.groupby("SK_ID_CURR")["SK_ID_PREV"]
-        .count()
-        .rename("PREV_APP_COUNT")
-    )
-
-    prev_status = (
-        prev_data.groupby("SK_ID_CURR")["NAME_CONTRACT_STATUS"]
-        .agg(lambda x: x.mode()[0] if not x.mode().empty else "Unknown")
-        .rename("PREV_MAIN_STATUS")
-    )
-
-    app_data = app_data.merge(refusal_flag, on="SK_ID_CURR", how="left")
-    app_data = app_data.merge(prev_app_count, on="SK_ID_CURR", how="left")
-    app_data = app_data.merge(prev_status, on="SK_ID_CURR", how="left")
-
-    app_data["FLAG_EVER_REFUSED"] = app_data["FLAG_EVER_REFUSED"].fillna(0)
-    app_data["PREV_APP_COUNT"] = app_data["PREV_APP_COUNT"].fillna(0)
-    app_data["PREV_MAIN_STATUS"] = app_data["PREV_MAIN_STATUS"].fillna("No Previous History")
-
-    app_data["PREV_APPS_BIN"] = pd.cut(
-        app_data["PREV_APP_COUNT"],
-        bins=[-1, 0, 2, 4, 9, 1000],
-        labels=["0", "1-2", "3-4", "5-9", "10+"],
-    )
-
-    status_risk_map = {
-        "Refused": 4,
-        "Canceled": 3,
-        "Unused offer": 2,
-        "Approved": 1,
-        "No Previous History": 0,
-    }
-    app_data["PREV_STATUS_RISK"] = app_data["PREV_MAIN_STATUS"].map(status_risk_map).fillna(0)
-
-    # ---------------------------
-    # 3) Stress bands
-    # ---------------------------
-    emi_bins = [0, 0.10, 0.20, 0.30, 0.50, 1.0]
-    emi_labels = ["<10%", "10–20%", "20–30%", "30–50%", "50%+"]
-    app_data["EMI_BIN"] = pd.cut(
-        app_data["ANNUITY_INCOME_RATIO"],
-        bins=emi_bins,
-        labels=emi_labels,
-        include_lowest=True,
-    )
-
-    credit_bins = [0, 1, 2, 3, 5, 10]
-    credit_labels = ["0–1x", "1–2x", "2–3x", "3–5x", "5x+"]
-    app_data["CREDIT_BIN"] = pd.cut(
-        app_data["CREDIT_INCOME_RATIO"],
-        bins=credit_bins,
-        labels=credit_labels,
-        include_lowest=True,
-    )
-
-    income_bins = [0, 50_000, 100_000, 150_000, 300_000, 99_999_999]
-    income_labels = ["<50k", "50-100k", "100-150k", "150-300k", "300k+"]
-    app_data["INCOME_BIN"] = pd.cut(
-        app_data["INCOME_PER_PERSON"],
-        bins=income_bins,
-        labels=income_labels,
-        include_lowest=True,
-    )
-
-    # ---------------------------
-    # 4) External score features
-    # ---------------------------
-    if "EXT_SOURCE_2" in app_data.columns:
-        app_data["EXT2_Q"] = pd.qcut(
-            app_data["EXT_SOURCE_2"],
-            4,
-            labels=["Q1 (low)", "Q2", "Q3", "Q4 (high)"],
-        )
-    else:
-        app_data["EXT2_Q"] = np.nan
-
-    # ---------------------------
-    # 5) Risk scores (FIN, BEHAV, EXT, total)
-    # ---------------------------
-    credit_points = {"0–1x": 0, "1–2x": 1, "2–3x": 2, "3–5x": 3, "5x+": 4}
-    app_data["CREDIT_BIN"] = app_data["CREDIT_BIN"].astype(str)
-    app_data["FIN_SCORE"] = app_data["CREDIT_BIN"].map(credit_points)
-
-    app_data["FLAG_EVER_REFUSED"] = app_data["FLAG_EVER_REFUSED"].fillna(0).astype(int)
-    app_data["BEHAV_SCORE"] = app_data["FLAG_EVER_REFUSED"] * 2
-
-    ext_points = {"Q1 (low)": 3, "Q2": 2, "Q3": 1, "Q4 (high)": 0}
-    app_data["EXT2_Q"] = app_data["EXT2_Q"].astype(str)
-    app_data["EXT_SCORE"] = app_data["EXT2_Q"].map(ext_points)
-
-    for c in ["FIN_SCORE", "BEHAV_SCORE", "EXT_SCORE"]:
-        app_data[c] = pd.to_numeric(app_data[c], errors="coerce").fillna(0)
-
-    app_data["RISK_SCORE"] = app_data["FIN_SCORE"] + app_data["BEHAV_SCORE"] + app_data["EXT_SCORE"]
-
-    # ---------------------------
-    # 6) Build clean analytical dataset
-    # ---------------------------
-    export_cols = [
-        "SK_ID_CURR", "TARGET",
-
-        "AGE_YEARS", "NAME_EDUCATION_TYPE", "NAME_INCOME_TYPE",
-        "NAME_FAMILY_STATUS", "NAME_HOUSING_TYPE",
-
-        "CREDIT_INCOME_RATIO", "ANNUITY_INCOME_RATIO", "INCOME_PER_PERSON",
-        "CREDIT_BIN", "EMI_BIN", "INCOME_BIN", "FIN_SCORE",
-
-        "EXT_SOURCE_2", "EXT2_Q", "EXT_SCORE",
-
-        "FLAG_EVER_REFUSED", "PREV_APP_COUNT", "PREV_APPS_BIN",
-        "PREV_MAIN_STATUS", "PREV_STATUS_RISK", "BEHAV_SCORE",
-
-        "RISK_SCORE",
-    ]
-
-    clean_df = app_data[export_cols].copy()
-    return clean_df
-
-# --------------------------------------------------------------------
-# Helper: cap points before plotting
-# --------------------------------------------------------------------
-def sample_for_plot(df_in: pd.DataFrame, cols: list[str], max_points: int = 50_000):
-    df_plot = df_in[cols].dropna()
-    if len(df_plot) > max_points:
-        df_plot = df_plot.sample(max_points, random_state=42)
-    return df_plot
-
-# --------------------------------------------------------------------
-# MAIN
-# --------------------------------------------------------------------
-try:
-    df = load_and_prepare_data()
-except Exception as e:
-    st.error(f"❌ Failed to load data: {e}")
+required_cols = {"TARGET", "AGE_YEARS", "INCOME_PER_PERSON"}
+if not required_cols.issubset(df.columns):
+    st.error(f"clean_loan_risk.csv.gz is missing required columns: {required_cols - set(df.columns)}")
     st.stop()
 
-if "AGE_YEARS" not in df.columns:
-    st.error("AGE_YEARS column could not be created. Check source data.")
-    st.stop()
-
+# ----------------------------------------------------
+# FILTERS
+# ----------------------------------------------------
 st.sidebar.header("Filters")
 
 # Income per person filter
@@ -268,205 +72,449 @@ df_filtered = df[
 ]
 
 st.caption(
-    f"Visuals below use {len(df_filtered):,} filtered applicants "
-    f"(from {len(df):,} sampled rows of the portfolio)."
+    f"Visuals use {len(df_filtered):,} filtered applicants "
+    f"(from {len(df):,} rows in clean_loan_risk.csv.gz)."
 )
 
-# --------------------------------------------------------------------
-# Section 1: Financial stress and default
-# --------------------------------------------------------------------
-st.header("Financial stress vs default risk")
+# ----------------------------------------------------
+# HELPER: light sampling for charts
+# ----------------------------------------------------
+def sample_for_plot(df_in: pd.DataFrame, max_points: int = 80_000) -> pd.DataFrame:
+    if len(df_in) > max_points:
+        return df_in.sample(max_points, random_state=42)
+    return df_in
+
+# ====================================================
+# 1. Portfolio overview
+# ====================================================
+st.header("1. Portfolio overview")
 
 col1, col2 = st.columns(2)
 
-# 1A) Default by credit / income band
+# (1) TARGET distribution
 with col1:
-    rate_credit = (
-        df_filtered.groupby("CREDIT_BIN")["TARGET"]
-        .mean()
-        .reset_index()
-        .sort_values("CREDIT_BIN")
+    target_counts = (
+        df_filtered["TARGET"]
+        .value_counts(normalize=True)
+        .rename_axis("TARGET")
+        .reset_index(name="share")
+        .sort_values("TARGET")
     )
+    target_counts["Label"] = target_counts["TARGET"].map({0: "Non-Defaulter (0)", 1: "Defaulter (1)"})
 
-    fig_credit = px.bar(
-        rate_credit,
-        x="CREDIT_BIN",
-        y="TARGET",
-        color="CREDIT_BIN",
+    fig_tgt = px.bar(
+        target_counts,
+        x="Label",
+        y="share",
+        color="Label",
         color_discrete_sequence=PLOTLY_COLORS,
-        labels={"TARGET": "Default rate", "CREDIT_BIN": "Credit / Income band"},
-        title="Default rate by credit / income ratio band",
+        labels={"share": "Share of portfolio"},
+        title="Overall default vs non-default share",
     )
-    fig_credit.update_yaxes(tickformat=".0%")
-    st.plotly_chart(fig_credit, width="stretch")
+    fig_tgt.update_yaxes(tickformat=".0%")
+    st.plotly_chart(fig_tgt, width="stretch")
 
-# 1B) Default by EMI / income band
+# (2) Top-15 missing columns (from precomputed in Colab; here we approximate by non-null ratio if present)
 with col2:
-    rate_emi = (
-        df_filtered.groupby("EMI_BIN")["TARGET"]
-        .mean()
-        .reset_index()
-        .sort_values("EMI_BIN")
-    )
-
-    fig_emi = px.bar(
-        rate_emi,
-        x="EMI_BIN",
-        y="TARGET",
-        color="EMI_BIN",
-        color_discrete_sequence=PLOTLY_COLORS,
-        labels={"TARGET": "Default rate", "EMI_BIN": "EMI / Income band"},
-        title="Default rate by EMI / income ratio band",
-    )
-    fig_emi.update_yaxes(tickformat=".0%")
-    st.plotly_chart(fig_emi, width="stretch")
+    # If original missing info not in clean file, approximate from available columns
+    na_series = df_filtered.isnull().mean().sort_values(ascending=False).head(15)
+    if len(na_series) > 0:
+        miss_df = na_series.reset_index()
+        miss_df.columns = ["column", "missing_pct"]
+        fig_miss = px.bar(
+            miss_df,
+            y="column",
+            x="missing_pct",
+            orientation="h",
+            color_discrete_sequence=[PLOTLY_COLORS[1]],
+            labels={"missing_pct": "Missing %", "column": ""},
+            title="Approx. top-15 missing columns (clean dataset)",
+        )
+        fig_miss.update_xaxes(tickformat=".0%")
+        st.plotly_chart(fig_miss, width="stretch")
+    else:
+        st.info("No missingness pattern visible in clean dataset.")
 
 st.markdown(
-    "- Default risk increases as both total credit and EMI become larger relative to income.\n"
-    "- Applicants with low credit/income and low EMI/income bands are strong candidates for fast-track approval."
+    "- The portfolio is highly imbalanced with a small share of defaulters.\n"
+    "- Most missingness is in low-value building/real-estate attributes that were dropped during cleaning."
 )
 
-# --------------------------------------------------------------------
-# Section 2: Behavioural red flags
-# --------------------------------------------------------------------
-st.header("Behavioural risk signals")
+# ====================================================
+# 2. Profile-based segment risk
+# ====================================================
+st.header("2. Customer profile segment risk")
 
 col3, col4 = st.columns(2)
 
-# 2A) Default by previous refusal history
+# (3) Default by education
 with col3:
-    rate_refusal = (
-        df_filtered.groupby("FLAG_EVER_REFUSED")["TARGET"]
-        .mean()
-        .reset_index()
-    )
-    rate_refusal["Label"] = rate_refusal["FLAG_EVER_REFUSED"].map(
-        {0: "Never Refused", 1: "Had Refusal"}
-    )
+    if "NAME_EDUCATION_TYPE" in df_filtered.columns:
+        edu_rate = (
+            df_filtered.groupby("NAME_EDUCATION_TYPE")["TARGET"]
+            .mean()
+            .reset_index()
+            .sort_values("TARGET", ascending=False)
+        )
+        fig_edu = px.bar(
+            edu_rate,
+            x="NAME_EDUCATION_TYPE",
+            y="TARGET",
+            color="NAME_EDUCATION_TYPE",
+            color_discrete_sequence=PLOTLY_COLORS,
+            labels={"TARGET": "Default rate", "NAME_EDUCATION_TYPE": "Education"},
+            title="Default rate by education level",
+        )
+        fig_edu.update_yaxes(tickformat=".0%")
+        fig_edu.update_xaxes(tickangle=30)
+        st.plotly_chart(fig_edu, width="stretch")
+    else:
+        st.info("Education column not found in clean dataset.")
 
-    fig_ref = px.bar(
-        rate_refusal,
-        x="Label",
-        y="TARGET",
-        color="Label",
-        color_discrete_sequence=PLOTLY_COLORS,
-        labels={"TARGET": "Default rate", "Label": ""},
-        title="Default rate by previous refusal history",
-    )
-    fig_ref.update_yaxes(tickformat=".0%")
-    st.plotly_chart(fig_ref, width="stretch")
-
-# 2B) Default by number of previous applications
+# (4) Default by income type
 with col4:
-    rate_prev_apps = (
-        df_filtered.groupby("PREV_APPS_BIN")["TARGET"]
-        .mean()
-        .reset_index()
-        .sort_values("PREV_APPS_BIN")
-    )
-
-    fig_prev = px.bar(
-        rate_prev_apps,
-        x="PREV_APPS_BIN",
-        y="TARGET",
-        color="PREV_APPS_BIN",
-        color_discrete_sequence=PLOTLY_COLORS,
-        labels={"TARGET": "Default rate", "PREV_APPS_BIN": "Previous applications"},
-        title="Default rate by number of previous applications",
-    )
-    fig_prev.update_yaxes(tickformat=".0%")
-    st.plotly_chart(fig_prev, width="stretch")
-
-st.markdown(
-    "- A history of past refusals and many previous applications are clear red flags for future default.\n"
-    "- Customers with past refusals or 10+ prior applications should be routed to manual review or stricter policy."
-)
-
-# --------------------------------------------------------------------
-# Section 3: External score & profile quality
-# --------------------------------------------------------------------
-st.header("External score and profile quality")
+    if "NAME_INCOME_TYPE" in df_filtered.columns:
+        inc_rate = (
+            df_filtered.groupby("NAME_INCOME_TYPE")["TARGET"]
+            .mean()
+            .reset_index()
+            .sort_values("TARGET", ascending=False)
+        )
+        fig_inc = px.bar(
+            inc_rate,
+            x="NAME_INCOME_TYPE",
+            y="TARGET",
+            color="NAME_INCOME_TYPE",
+            color_discrete_sequence=PLOTLY_COLORS,
+            labels={"TARGET": "Default rate", "NAME_INCOME_TYPE": "Income type"},
+            title="Default rate by income type",
+        )
+        fig_inc.update_yaxes(tickformat=".0%")
+        fig_inc.update_xaxes(tickangle=30)
+        st.plotly_chart(fig_inc, width="stretch")
+    else:
+        st.info("Income type column not found in clean dataset.")
 
 col5, col6 = st.columns(2)
 
-# 3A) Default by external score quartile
+# (5) Default by family status
 with col5:
-    rate_ext = (
-        df_filtered.groupby("EXT2_Q")["TARGET"]
-        .mean()
-        .reset_index()
-        .sort_values("EXT2_Q")
-    )
+    if "NAME_FAMILY_STATUS" in df_filtered.columns:
+        fam_rate = (
+            df_filtered.groupby("NAME_FAMILY_STATUS")["TARGET"]
+            .mean()
+            .reset_index()
+            .sort_values("TARGET", ascending=False)
+        )
+        fig_fam = px.bar(
+            fam_rate,
+            x="NAME_FAMILY_STATUS",
+            y="TARGET",
+            color="NAME_FAMILY_STATUS",
+            color_discrete_sequence=PLOTLY_COLORS,
+            labels={"TARGET": "Default rate", "NAME_FAMILY_STATUS": "Family status"},
+            title="Default rate by family status",
+        )
+        fig_fam.update_yaxes(tickformat=".0%")
+        fig_fam.update_xaxes(tickangle=30)
+        st.plotly_chart(fig_fam, width="stretch")
+    else:
+        st.info("Family status column not found in clean dataset.")
 
-    fig_ext = px.bar(
-        rate_ext,
-        x="EXT2_Q",
-        y="TARGET",
-        color="EXT2_Q",
-        color_discrete_sequence=PLOTLY_COLORS,
-        labels={"TARGET": "Default rate", "EXT2_Q": "External score quartile"},
-        title="Default rate by external risk score (EXT_SOURCE_2)",
-    )
-    fig_ext.update_yaxes(tickformat=".0%")
-    st.plotly_chart(fig_ext, width="stretch")
-
-# 3B) Default by education x external score (heatmap-style bar)
+# (6) Default by housing type
 with col6:
-    df_edu = df_filtered.dropna(subset=["NAME_EDUCATION_TYPE", "EXT2_Q"])
-    # restrict to main education groups to keep chart readable
-    top_edu = (
-        df_edu["NAME_EDUCATION_TYPE"]
-        .value_counts()
-        .head(5)
-        .index
-    )
-    df_edu = df_edu[df_edu["NAME_EDUCATION_TYPE"].isin(top_edu)]
+    if "NAME_HOUSING_TYPE" in df_filtered.columns:
+        house_rate = (
+            df_filtered.groupby("NAME_HOUSING_TYPE")["TARGET"]
+            .mean()
+            .reset_index()
+            .sort_values("TARGET", ascending=False)
+        )
+        fig_house = px.bar(
+            house_rate,
+            x="NAME_HOUSING_TYPE",
+            y="TARGET",
+            color="NAME_HOUSING_TYPE",
+            color_discrete_sequence=PLOTLY_COLORS,
+            labels={"TARGET": "Default rate", "NAME_HOUSING_TYPE": "Housing type"},
+            title="Default rate by housing type",
+        )
+        fig_house.update_yaxes(tickformat=".0%")
+        fig_house.update_xaxes(tickangle=30)
+        st.plotly_chart(fig_house, width="stretch")
+    else:
+        st.info("Housing type column not found in clean dataset.")
 
-    rate_edu_ext = (
-        df_edu.groupby(["NAME_EDUCATION_TYPE", "EXT2_Q"])["TARGET"]
+st.markdown(
+    "- Lower education, unstable or informal income, and renting/parental housing are all associated with higher default risk.\n"
+    "- Stable profiles (higher education, state servants, married, home-owners) form safer applicant segments."
+)
+
+# ====================================================
+# 3. Financial stress & affordability
+# ====================================================
+st.header("3. Financial stress & affordability")
+
+col7, col8 = st.columns(2)
+
+# (7) Default by credit/income bands
+with col7:
+    if "CREDIT_BIN" in df_filtered.columns:
+        credit_rate = (
+            df_filtered.groupby("CREDIT_BIN")["TARGET"]
+            .mean()
+            .reset_index()
+            .sort_values("CREDIT_BIN")
+        )
+        fig_credit = px.bar(
+            credit_rate,
+            x="CREDIT_BIN",
+            y="TARGET",
+            color="CREDIT_BIN",
+            color_discrete_sequence=PLOTLY_COLORS,
+            labels={"TARGET": "Default rate", "CREDIT_BIN": "Credit / income band"},
+            title="Default rate by credit / income ratio",
+        )
+        fig_credit.update_yaxes(tickformat=".0%")
+        st.plotly_chart(fig_credit, width="stretch")
+    else:
+        st.info("CREDIT_BIN not found in clean dataset.")
+
+# (8) Default by EMI/income bands
+with col8:
+    if "EMI_BIN" in df_filtered.columns:
+        emi_rate = (
+            df_filtered.groupby("EMI_BIN")["TARGET"]
+            .mean()
+            .reset_index()
+            .sort_values("EMI_BIN")
+        )
+        fig_emi = px.bar(
+            emi_rate,
+            x="EMI_BIN",
+            y="TARGET",
+            color="EMI_BIN",
+            color_discrete_sequence=PLOTLY_COLORS,
+            labels={"TARGET": "Default rate", "EMI_BIN": "EMI / income band"},
+            title="Default rate by EMI / income ratio",
+        )
+        fig_emi.update_yaxes(tickformat=".0%")
+        st.plotly_chart(fig_emi, width="stretch")
+    else:
+        st.info("EMI_BIN not found in clean dataset.")
+
+# (9) Default by income-per-person bands
+st.subheader("Default by income-per-person bands")
+if "INCOME_BIN" in df_filtered.columns:
+    incp_rate = (
+        df_filtered.groupby("INCOME_BIN")["TARGET"]
         .mean()
         .reset_index()
+        .sort_values("INCOME_BIN")
     )
+    fig_incp = px.bar(
+        incp_rate,
+        x="INCOME_BIN",
+        y="TARGET",
+        color="INCOME_BIN",
+        color_discrete_sequence=PLOTLY_COLORS,
+        labels={"TARGET": "Default rate", "INCOME_BIN": "Income per person band"},
+        title="Default rate by income per person",
+    )
+    fig_incp.update_yaxes(tickformat=".0%")
+    st.plotly_chart(fig_incp, width="stretch")
+else:
+    st.info("INCOME_BIN not found in clean dataset.")
 
-    fig_edu_ext = px.imshow(
-        rate_edu_ext.pivot(index="NAME_EDUCATION_TYPE", columns="EXT2_Q", values="TARGET") * 100,
-        color_continuous_scale="Blues",
-        labels={"color": "Default rate (%)"},
-        aspect="auto",
-        title="Default rate (%) by education level × external score",
+# (10) Defaulters-only distribution of CREDIT_INCOME_RATIO (cleaned)
+st.subheader("Defaulters – credit/income ratio distribution")
+if "CREDIT_INCOME_RATIO" in df_filtered.columns:
+    df_def = df_filtered[df_filtered["TARGET"] == 1].copy()
+    df_def = df_def[df_def["CREDIT_INCOME_RATIO"].between(0, 10)]  # cleaned band
+    df_def = sample_for_plot(df_def)
+    fig_def_ci = px.histogram(
+        df_def,
+        x="CREDIT_INCOME_RATIO",
+        nbins=40,
+        color_discrete_sequence=[PLOTLY_COLORS[3]],
+        title="Defaulters: credit/income ratio (cleaned)",
     )
-    st.plotly_chart(fig_edu_ext, width="stretch")
+    st.plotly_chart(fig_def_ci, width="stretch")
+else:
+    st.info("CREDIT_INCOME_RATIO not found in clean dataset.")
 
 st.markdown(
-    "- Lower external score quartiles show much higher default rates, even within the same education band.\n"
-    "- Combining education level with external score helps separate very safe academic/high-score profiles from riskier low-score, low-education segments."
+    "- Default risk increases sharply when **total credit exceeds ~3× income** and **EMI exceeds ~20% of income**.\n"
+    "- Low income per person and mid-to-high credit burden are where most defaulters cluster."
 )
 
-# --------------------------------------------------------------------
-# Section 4: Combined risk score
-# --------------------------------------------------------------------
-st.header("Combined risk score bands")
+# ====================================================
+# 4. Behavioural risk from previous loans
+# ====================================================
+st.header("4. Behavioural risk from previous loans")
 
-rate_risk = (
-    df_filtered.groupby("RISK_SCORE")["TARGET"]
-    .mean()
-    .reset_index()
-    .sort_values("RISK_SCORE")
-)
+col9, col10 = st.columns(2)
 
-fig_risk = px.bar(
-    rate_risk,
-    x="RISK_SCORE",
-    y="TARGET",
-    color="RISK_SCORE",
-    color_discrete_sequence=PLOTLY_COLORS,
-    labels={"TARGET": "Default rate", "RISK_SCORE": "Risk score"},
-    title="Default rate by combined risk score",
-)
-fig_risk.update_yaxes(tickformat=".0%")
-st.plotly_chart(fig_risk, width="stretch")
+# (11) Default by previous refusal history
+with col9:
+    if "FLAG_EVER_REFUSED" in df_filtered.columns:
+        ref_rate = (
+            df_filtered.groupby("FLAG_EVER_REFUSED")["TARGET"]
+            .mean()
+            .reset_index()
+        )
+        ref_rate["Label"] = ref_rate["FLAG_EVER_REFUSED"].map(
+            {0: "Never refused", 1: "Had refusal"}
+        )
+        fig_ref = px.bar(
+            ref_rate,
+            x="Label",
+            y="TARGET",
+            color="Label",
+            color_discrete_sequence=PLOTLY_COLORS,
+            labels={"TARGET": "Default rate", "Label": ""},
+            title="Default rate by refusal history",
+        )
+        fig_ref.update_yaxes(tickformat=".0%")
+        st.plotly_chart(fig_ref, width="stretch")
+    else:
+        st.info("FLAG_EVER_REFUSED not found in clean dataset.")
+
+# (12) Default by number of previous applications
+with col10:
+    if "PREV_APPS_BIN" in df_filtered.columns:
+        apps_rate = (
+            df_filtered.groupby("PREV_APPS_BIN")["TARGET"]
+            .mean()
+            .reset_index()
+            .sort_values("PREV_APPS_BIN")
+        )
+        fig_apps = px.bar(
+            apps_rate,
+            x="PREV_APPS_BIN",
+            y="TARGET",
+            color="PREV_APPS_BIN",
+            color_discrete_sequence=PLOTLY_COLORS,
+            labels={"TARGET": "Default rate", "PREV_APPS_BIN": "Previous applications"},
+            title="Default rate by number of previous applications",
+        )
+        fig_apps.update_yaxes(tickformat=".0%")
+        st.plotly_chart(fig_apps, width="stretch")
+    else:
+        st.info("PREV_APPS_BIN not found in clean dataset.")
+
+# (13) Default by previous main contract status
+st.subheader("Default by previous main contract status")
+if "PREV_MAIN_STATUS" in df_filtered.columns:
+    status_rate = (
+        df_filtered.groupby("PREV_MAIN_STATUS")["TARGET"]
+        .mean()
+        .reset_index()
+        .sort_values("TARGET", ascending=False)
+    )
+    fig_status = px.bar(
+        status_rate,
+        x="PREV_MAIN_STATUS",
+        y="TARGET",
+        color="PREV_MAIN_STATUS",
+        color_discrete_sequence=PLOTLY_COLORS,
+        labels={"TARGET": "Default rate", "PREV_MAIN_STATUS": "Previous status"},
+        title="Default rate by previous contract status",
+    )
+    fig_status.update_yaxes(tickformat=".0%")
+    fig_status.update_xaxes(tickangle=25)
+    st.plotly_chart(fig_status, width="stretch")
+else:
+    st.info("PREV_MAIN_STATUS not found in clean dataset.")
 
 st.markdown(
-    "- Lower risk scores (e.g., 0–2) correspond to safer borrowers with modest stress and clean behaviour.\n"
-    "- Mid scores (3–5) are watchlist segments, while high scores (6+) represent red-flag customers with stacked financial, behavioural, and external risk."
+    "- Past refusals and heavy prior application activity both signal higher default risk.\n"
+    "- Previous statuses rank roughly as: **Refused > Canceled/Unused > Approved/No history** in terms of risk."
 )
+
+# ====================================================
+# 5. External scores
+# ====================================================
+st.header("5. External credit scores")
+
+col11, col12 = st.columns(2)
+
+# (14) Default by EXT_SOURCE_2 bands / quartiles
+with col11:
+    if "EXT2_Q" in df_filtered.columns:
+        ext_rate = (
+            df_filtered.groupby("EXT2_Q")["TARGET"]
+            .mean()
+            .reset_index()
+            .sort_values("EXT2_Q")
+        )
+        fig_ext = px.bar(
+            ext_rate,
+            x="EXT2_Q",
+            y="TARGET",
+            color="EXT2_Q",
+            color_discrete_sequence=PLOTLY_COLORS,
+            labels={"TARGET": "Default rate", "EXT2_Q": "EXT_SOURCE_2 quartile"},
+            title="Default rate by external score quartile (EXT_SOURCE_2)",
+        )
+        fig_ext.update_yaxes(tickformat=".0%")
+        st.plotly_chart(fig_ext, width="stretch")
+    else:
+        st.info("EXT2_Q not found in clean dataset.")
+
+# (15) EXT_SOURCE_2 distribution by default vs non-default
+with col12:
+    if "EXT_SOURCE_2" in df_filtered.columns:
+        df_ext = df_filtered[["EXT_SOURCE_2", "TARGET"]].dropna()
+        df_ext = sample_for_plot(df_ext)
+        fig_ext_dist = px.histogram(
+            df_ext,
+            x="EXT_SOURCE_2",
+            color="TARGET",
+            nbins=50,
+            barmode="overlay",
+            color_discrete_sequence=[PLOTLY_COLORS[0], PLOTLY_COLORS[3]],
+            title="EXT_SOURCE_2 distribution by default status",
+            labels={"TARGET": "Default flag"},
+        )
+        st.plotly_chart(fig_ext_dist, width="stretch")
+    else:
+        st.info("EXT_SOURCE_2 not found in clean dataset.")
+
+st.markdown(
+    "- Lower external score quartiles show **2–3× higher default** than top quartiles.\n"
+    "- Defaulters are concentrated at the low end of EXT_SOURCE_2, confirming the power of external scores."
+)
+
+# ====================================================
+# 6. Combined risk score
+# ====================================================
+st.header("6. Combined risk score")
+
+# (16) Default rate by RISK_SCORE
+if "RISK_SCORE" in df_filtered.columns:
+    risk_rate = (
+        df_filtered.groupby("RISK_SCORE")["TARGET"]
+        .mean()
+        .reset_index()
+        .sort_values("RISK_SCORE")
+    )
+    fig_risk = px.bar(
+        risk_rate,
+        x="RISK_SCORE",
+        y="TARGET",
+        color="RISK_SCORE",
+        color_discrete_sequence=PLOTLY_COLORS,
+        labels={"TARGET": "Default rate", "RISK_SCORE": "Risk score"},
+        title="Default rate by combined risk score",
+    )
+    fig_risk.update_yaxes(tickformat=".0%")
+    st.plotly_chart(fig_risk, width="stretch")
+
+    st.markdown(
+        "- **Low scores (0–2)**: safest borrowers with low stress, clean behaviour, and strong external scores.\n"
+        "- **Mid scores (3–5)**: watchlist customers needing tighter limits and closer review.\n"
+        "- **High scores (6+)**: red-flag group combining high financial stress, negative behaviour, and weak scores."
+    )
+else:
+    st.info("RISK_SCORE not found in clean dataset.")
