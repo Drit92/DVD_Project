@@ -71,10 +71,7 @@ df_filtered = df[
     & df["AGE_YEARS"].between(age_slider[0], age_slider[1])
 ]
 
-st.caption(
-    f"Visuals use {len(df_filtered):,} filtered applicants "
-    f"(from {len(df):,} rows in clean_loan_risk.csv.gz)."
-)
+
 
 # ----------------------------------------------------
 # HELPER: light sampling for charts
