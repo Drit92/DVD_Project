@@ -144,10 +144,7 @@ df_filtered = df[
     & df["AGE_YEARS"].between(age_slider[0], age_slider[1])
 ]
 
-st.caption(
-    f"Visuals use {len(df_filtered):,} filtered applicants "
-    f"(from {len(df):,} rows in clean_loan_risk.csv.gz)."
-)
+
 
 def sample_for_plot(df_in: pd.DataFrame, max_points: int = 80_000) -> pd.DataFrame:
     if len(df_in) > max_points:
@@ -654,65 +651,6 @@ if "RISK_SCORE" in df_filtered.columns:
 else:
     st.info("RISK_SCORE not found in clean dataset.")
 
-# Radar chart: defaulters vs non-defaulters
-st.subheader("Radar: risk profile – defaulters vs non-defaulters")
 
-radar_cols = [
-    "CREDIT_INCOME_RATIO",
-    "ANNUITY_INCOME_RATIO",
-    "FLAG_EVER_REFUSED",
-    "EXT_SOURCE_2",
-    "AGE_YEARS",
-    "AMT_INCOME_TOTAL",
-]
-if set(radar_cols).issubset(df_filtered.columns):
-    radar_data = (
-        df_filtered.groupby("TARGET")[radar_cols]
-        .mean()
-        .T
-    )
-    radar_norm = radar_data.apply(
-        lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9),
-        axis=1,
-    )
-
-    labels = radar_norm.index.tolist()
-    angles = np.linspace(0, 2 * math.pi, len(labels), endpoint=False).tolist()
-    angles += angles[:1]
-
-    vals0 = radar_norm.get(0, pd.Series([0] * len(labels), index=labels)).tolist()
-    vals1 = radar_norm.get(1, pd.Series([0] * len(labels), index=labels)).tolist()
-    vals0 += vals0[:1]
-    vals1 += vals1[:1]
-
-    # Plotly radar via polar line plots
-    fig_radar = px.line_polar(
-        r=vals0,
-        theta=labels + [labels[0]],
-        line_close=True,
-        color_discrete_sequence=["green"],
-    )
-    fig_radar.data[0].name = "Non-defaulters"
-    fig_radar.add_scatterpolar(
-        r=vals1,
-        theta=labels + [labels[0]],
-        line_close=True,
-        mode="lines",
-        line_color="red",
-        name="Defaulters",
-    )
-    fig_radar.update_traces(fill="toself", opacity=0.4)
-    fig_radar.update_layout(
-        title="Risk profile comparison – defaulters vs non-defaulters",
-        showlegend=True,
-    )
-    st.plotly_chart(fig_radar, width="stretch")
-
-    st.markdown(
-        "- **Non-defaulters** have lower credit and EMI burden, higher age/income, and stronger external scores.\n"
-        "- **Defaulters** show **higher financial stress, more refusals, and weaker scores**, forming a clearly riskier profile."
-    )
-else:
-    st.info("Not all radar features are present in clean dataset.")
 
 st.markdown('</div>', unsafe_allow_html=True)
