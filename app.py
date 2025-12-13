@@ -232,17 +232,11 @@ st.markdown("---")
 # === 4. BUBBLE CHART – EXTERNAL SCORE vs REFUSAL (NON‑OVERLAPPING) ===
 st.header("🎯 External Score + Past Refusal – Combined Risk")
 
-# Assume EXT2_Q_NUM (1–4) exists alongside pretty labels EXT2_Q; if not, derive it
+# Assume EXT2_Q_NUM (1–4) exists; otherwise map from labels as before
 if 'EXT2_Q_NUM' in df.columns:
     bubble_src = df[['EXT2_Q', 'EXT2_Q_NUM', 'FLAG_EVER_REFUSED', 'TARGET']].dropna()
 else:
-    # Fallback: map pretty labels like "Q1 (low)" → 1, etc.
-    label_to_num = {
-        'Q1 (low)': 1,
-        'Q2': 2,
-        'Q3': 3,
-        'Q4 (high)': 4
-    }
+    label_to_num = {'Q1 (low)': 1, 'Q2': 2, 'Q3': 3, 'Q4 (high)': 4}
     tmp = df[['EXT2_Q', 'FLAG_EVER_REFUSED', 'TARGET']].dropna().copy()
     tmp['EXT2_Q_NUM'] = tmp['EXT2_Q'].map(label_to_num)
     bubble_src = tmp.dropna(subset=['EXT2_Q_NUM'])
@@ -255,6 +249,7 @@ bubble_final = pd.DataFrame({
     'Count': bubble_count
 }).reset_index()
 
+# Jitter x‑position slightly to avoid overlap
 offset_map = {0: -0.12, 1: 0.12}
 bubble_final['x_pos'] = bubble_final['EXT2_Q_NUM'] + bubble_final['FLAG_EVER_REFUSED'].map(offset_map)
 
@@ -265,7 +260,7 @@ fig_bubble = px.scatter(
     size='Count',
     color='FLAG_EVER_REFUSED',
     size_max=40,
-    color_discrete_map={0: 'green', 1: 'red'},
+    color_discrete_map={0: 'green', 1: 'red'},  # 0 = clean (green), 1 = refused (red)
     labels={
         'x_pos': 'External score quartile (higher = safer)',
         'DefaultRate': 'Default rate (%)',
@@ -285,7 +280,7 @@ st.plotly_chart(fig_bubble, width='stretch')
 
 st.markdown("""
 **Insights:**
-- For any given external‑score quartile, customers with **past refusals** (red) default more often than those with clean histories (green).
+- For any given external‑score quartile, customers with **past refusals (red)** default more often than those with **clean histories (green)**.
 - Big green bubbles in higher quartiles are **safe, high‑volume customers**; small red bubbles in low quartiles are **concentrated risk pockets**.
 """)
 st.markdown("---")
