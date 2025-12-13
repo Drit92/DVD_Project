@@ -22,15 +22,50 @@ def load_data():
 app_data, df = load_data()
 st.success(f"✅ Loaded {len(df):,} records | 🔴 Default Rate: {df['TARGET'].mean():.1%}")
 
-# Precompute defaulters once
+# ----------------------------------------------------
+# Loan-type filter ONLY for baseline (section 1)
+# ----------------------------------------------------
+loan_col = 'NAME_CONTRACT_TYPE'
+if loan_col in app_data.columns:
+    st.subheader("Filter baseline default by loan type")
+
+    type_map = {
+        'Cash loans': 'Personal loan',
+        'Revolving loans': 'Revolving / card'
+    }
+    app_data['LOAN_KIND'] = app_data[loan_col].map(type_map).fillna(app_data[loan_col])
+
+    loan_options = ["All loans"] + sorted(app_data['LOAN_KIND'].unique().tolist())
+    selected_loan = st.radio(
+        "Select loan type:",
+        loan_options,
+        horizontal=True
+    )
+
+    if selected_loan == "All loans":
+        mask_ids = app_data['SK_ID_CURR']
+    else:
+        mask_ids = app_data.loc[app_data['LOAN_KIND'] == selected_loan, 'SK_ID_CURR']
+
+    df_base = df[df['SK_ID_CURR'].isin(mask_ids)]
+else:
+    selected_loan = "All loans"
+    df_base = df
+
+st.write(
+    f"📌 Baseline view: **{selected_loan}** "
+    f"(records in view: {len(df_base):,}, default rate: {df_base['TARGET'].mean():.1%})"
+)
+
+# Precompute defaulters for full dataset (used later)
 df_def = df[df['TARGET'] == 1].copy()
 
-# === 1. PORTFOLIO OVERVIEW ===
+# === 1. PORTFOLIO OVERVIEW (loan‑type aware) ===
 st.header("📈 Portfolio Overview – Who Defaults?")
 col1, col2 = st.columns([1, 2])
 
 with col1:
-    target_counts = df['TARGET'].value_counts()
+    target_counts = df_base['TARGET'].value_counts()
     fig_donut = go.Figure(data=[
         go.Pie(
             labels=['Good borrower (0)', 'Defaulter (1)'],
@@ -47,13 +82,13 @@ with col1:
         height=260,
         margin=dict(t=40, b=10)
     )
-    st.plotly_chart(fig_donut, width='stretch')
+    st.plotly_chart(fig_donut, width="stretch")
 
 with col2:
     c1, c2, c3 = st.columns(3)
-    c1.metric("Total Applicants", f"{len(df):,}")
-    c2.metric("Total Defaulters", f"{df['TARGET'].sum():,}", f"{df['TARGET'].mean():.1%}")
-    c3.metric("Total Good Borrowers", f"{(1-df['TARGET']).sum():,}")
+    c1.metric("Total Applicants", f"{len(df_base):,}")
+    c2.metric("Total Defaulters", f"{df_base['TARGET'].sum():,}", f"{df_base['TARGET'].mean():.1%}")
+    c3.metric("Total Good Borrowers", f"{(1 - df_base['TARGET']).sum():,}")
 
 st.markdown("""
 **Overview story:** Most customers repay on time; only a small share (about 8%) default, so the dataset is highly imbalanced.
@@ -65,7 +100,7 @@ st.header("🧍 Borrower Profiles – Who Applies?")
 
 col1, col2 = st.columns(2)
 
-# Gender mix (Pie)
+# Gender mix (whole portfolio)
 with col1:
     st.subheader("Applicant Gender Mix")
     gender_df = app_data[app_data['CODE_GENDER'] != 'XNA'].copy()
@@ -89,9 +124,9 @@ with col1:
         margin=dict(t=40, l=10, r=10, b=10),
         height=260
     )
-    st.plotly_chart(fig_gender_pie, width='stretch')
+    st.plotly_chart(fig_gender_pie, width="stretch")
 
-# Overall age distribution
+# Overall age distribution (whole portfolio)
 with col2:
     st.subheader("Applicant Age Distribution")
     fig_age_all = px.histogram(
@@ -104,7 +139,7 @@ with col2:
     )
     fig_age_all.update_traces(marker_line_width=1.2, marker_line_color='black')
     fig_age_all.update_layout(height=260)
-    st.plotly_chart(fig_age_all, width='stretch')
+    st.plotly_chart(fig_age_all, width="stretch")
 
 st.markdown("""
 **Insights:**
@@ -141,7 +176,8 @@ risk_columns = [
 for i, col in enumerate(risk_columns):
     if col in app_data.columns:
         r, c = divmod(i, 2)
-        r += 1; c += 1
+        r += 1
+        c += 1
 
         default_rate = (
             app_data.groupby(col)['TARGET']
@@ -170,7 +206,7 @@ fig_dem.update_layout(
     title="Default Rate by Demographic Group (safest → riskiest)",
     margin=dict(l=30, r=30, t=70, b=40)
 )
-st.plotly_chart(fig_dem, width='stretch')
+st.plotly_chart(fig_dem, width="stretch")
 
 st.markdown("""
 **Insights:**
@@ -193,7 +229,7 @@ fig_age_def = px.histogram(
 )
 fig_age_def.update_traces(marker_line_width=1.2, marker_line_color='black')
 fig_age_def.update_layout(height=260)
-st.plotly_chart(fig_age_def, width='stretch')
+st.plotly_chart(fig_age_def, width="stretch")
 
 st.markdown("""
 **Insight:** Most defaulters are between **about 28 and 45 years old**; default risk tapers off for older customers who tend to have more stable finances.
@@ -220,7 +256,7 @@ fig_trend = px.line(
 )
 fig_trend.update_traces(line_shape='linear', marker=dict(size=8))
 fig_trend.update_yaxes(ticksuffix="%")
-st.plotly_chart(fig_trend, width='stretch')
+st.plotly_chart(fig_trend, width="stretch")
 
 st.markdown("""
 **Insights:**
@@ -241,7 +277,6 @@ else:
     tmp['EXT2_Q_NUM'] = tmp['EXT2_Q'].map(label_to_num)
     bubble_src = tmp.dropna(subset=['EXT2_Q_NUM'])
 
-# 👉 make colour column categorical strings
 bubble_src['REFUSAL_STR'] = bubble_src['FLAG_EVER_REFUSED'].map({0: 'No refusal', 1: 'Had refusal'})
 
 bubble_group = bubble_src.groupby(['EXT2_Q_NUM', 'REFUSAL_STR'])['TARGET'].mean() * 100
@@ -252,7 +287,6 @@ bubble_final = pd.DataFrame({
     'Count': bubble_count
 }).reset_index()
 
-# Jitter so points do not overlap
 offset_map = {'No refusal': -0.12, 'Had refusal': 0.12}
 bubble_final['x_pos'] = bubble_final['EXT2_Q_NUM'] + bubble_final['REFUSAL_STR'].map(offset_map)
 
@@ -261,7 +295,7 @@ fig_bubble = px.scatter(
     x='x_pos',
     y='DefaultRate',
     size='Count',
-    color='REFUSAL_STR',                              # use string column
+    color='REFUSAL_STR',
     size_max=40,
     color_discrete_map={
         'No refusal': 'green',
@@ -285,8 +319,6 @@ fig_bubble.update_yaxes(ticksuffix="%")
 
 st.plotly_chart(fig_bubble, width="stretch")
 
-
-
 st.markdown("""
 **Insights:**
 - For any given external‑score quartile, customers with **past refusals (red)** default more often than those with **clean histories (green)**.
@@ -309,7 +341,7 @@ with col1:
         color_discrete_sequence=['#dc3545']
     )
     fig_refuse.update_yaxes(ticksuffix="%")
-    st.plotly_chart(fig_refuse, width='stretch')
+    st.plotly_chart(fig_refuse, width="stretch")
 
 with col2:
     apps_def = df.groupby('PREV_APPS_BIN', observed=True)['TARGET'].mean() * 100
@@ -323,7 +355,7 @@ with col2:
         color_discrete_sequence=['#e83e8c']
     )
     fig_apps.update_yaxes(ticksuffix="%")
-    st.plotly_chart(fig_apps, width='stretch')
+    st.plotly_chart(fig_apps, width="stretch")
 
 st.markdown("""
 **Insights:**
@@ -348,7 +380,7 @@ with col1:
         color_discrete_sequence=['#6f42c1']
     )
     fig_ext2.update_yaxes(ticksuffix="%")
-    st.plotly_chart(fig_ext2, width='stretch')
+    st.plotly_chart(fig_ext2, width="stretch")
 
 with col2:
     st.markdown("""
@@ -375,7 +407,7 @@ for trace in fig_hist.data:
         trace.name = 'Good borrower (0)'
     elif trace.name == '1':
         trace.name = 'Defaulter (1)'
-st.plotly_chart(fig_hist, width='stretch')
+st.plotly_chart(fig_hist, width="stretch")
 
 st.markdown("---")
 
@@ -405,7 +437,7 @@ fig_risk = px.bar(
     color_discrete_sequence=['#fd7e14']
 )
 fig_risk.update_yaxes(ticksuffix="%")
-st.plotly_chart(fig_risk, width='stretch')
+st.plotly_chart(fig_risk, width="stretch")
 
 st.markdown("""
 **Insight:** Low scores capture the **safest borrowers**, while high scores group together the **riskiest applicants**, so this single score can drive cut‑offs, pricing bands and watchlists.
@@ -457,7 +489,7 @@ if len(radar_cols) >= 3:
     ax_radar.legend(bbox_to_anchor=(1.05, 1.0), borderaxespad=0., fontsize=7)
     plt.tight_layout(pad=0.8)
 
-    st.pyplot(fig_radar, width='content')
+    st.pyplot(fig_radar, width="content")
 
     st.markdown("""
     **Insight:** The red shape (defaulters) bulges where debt burdens and refusals are higher and external scores weaker, while the green shape (non‑defaulters) shows lower leverage and stronger scores.
