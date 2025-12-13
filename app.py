@@ -475,40 +475,47 @@ if ext2_bubble.empty:
     st.info("EXT2 × refusal aggregate not available.")
 else:
     ext2_bubble = ext2_bubble.copy()
-    # Map quartiles to numeric axis positions 1..4
+
+    # Map quartiles to numeric base positions 1..4
     label_to_num = {"Q1 (low)": 1, "Q2": 2, "Q3": 3, "Q4 (high)": 4}
     ext2_bubble["EXT2_Q_NUM"] = ext2_bubble["EXT2_Q"].map(label_to_num)
     ext2_bubble = ext2_bubble.dropna(subset=["EXT2_Q_NUM"])
 
-    # Percent and pretty labels
+    # Percent and labels
     ext2_bubble["DefaultRate"] = ext2_bubble["DefaultRate"] * 100
     ext2_bubble["REFUSAL_STR"] = ext2_bubble["FLAG_EVER_REFUSED"].map(
         {0: "No refusal", 1: "Had refusal"}
     )
 
-    # Plot: same X per quartile, different color by refusal -> bubbles vertically aligned
+    # Slight x‑offset so bubbles don't sit exactly on top of each other
+    offset_map = {"No refusal": -0.08, "Had refusal": 0.08}
+    ext2_bubble["x_pos"] = (
+        ext2_bubble["EXT2_Q_NUM"]
+        + ext2_bubble["REFUSAL_STR"].map(offset_map)
+    )
+
     fig_bubble = px.scatter(
         ext2_bubble,
-        x="EXT2_Q_NUM",
+        x="x_pos",
         y="DefaultRate",
         size="Count",
         color="REFUSAL_STR",
         size_max=60,
         color_discrete_map={"No refusal": "green", "Had refusal": "red"},
         labels={
-            "EXT2_Q_NUM": "External score quartile (higher = safer)",
+            "x_pos": "External score quartile (higher = safer)",
             "DefaultRate": "Default rate (%)",
             "REFUSAL_STR": "Previous refusal",
         },
         title="External Score vs Past Refusal (Bubble Size = Number of Customers)",
     )
 
-    # Nice quartile tick labels
     quartile_ticks = sorted(ext2_bubble["EXT2_Q_NUM"].unique())
     fig_bubble.update_xaxes(
         tickmode="array",
         tickvals=quartile_ticks,
         ticktext=[f"Q{int(q)}" for q in quartile_ticks],
+        range=[0.5, 4.5],   # keep some padding left/right
     )
     fig_bubble.update_yaxes(ticksuffix="%")
     fig_bubble.update_layout(transition_duration=0)
@@ -522,6 +529,7 @@ st.markdown(
 - Big green bubbles in higher quartiles are **safe, high‑volume customers**; small red bubbles in low quartiles are **concentrated risk pockets**.
 """
 )
+
 
 st.markdown("---")
 
