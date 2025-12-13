@@ -61,8 +61,15 @@ st.markdown("""
 
 st.markdown("---")
 
-# === 2. DEMOGRAPHICS – MATCH COLAB (SEABORN 2x2 GRID) ===
+# === 2. DEMOGRAPHICS – SAME AS COLAB (USES app_data) ===
 st.header("👥 Demographic Segments – Who Is Riskier?")
+
+fig_dem = make_subplots(
+    rows=2, cols=2,
+    subplot_titles=('Education level', 'Type of income', 'Family status', 'Housing type'),
+    specs=[[{"type": "bar"}, {"type": "bar"}],
+           [{"type": "bar"}, {"type": "bar"}]]
+)
 
 risk_columns = [
     'NAME_EDUCATION_TYPE',
@@ -71,42 +78,45 @@ risk_columns = [
     'NAME_HOUSING_TYPE'
 ]
 
-# Create the same 2x2 layout as Colab
-fig_dem, axes = plt.subplots(2, 2, figsize=(10, 6))  # smaller than Colab 18x12
-axes = axes.flatten()
-
 for i, col in enumerate(risk_columns):
-    ax_i = axes[i]
+    if col in app_data.columns:
+        r, c = divmod(i, 2)
+        r += 1; c += 1
 
-    default_rate = (
-        df.groupby(col)['TARGET']
-        .mean()
-        .sort_values(ascending=False)
-    )
+        # Colab logic: default rate by category, sorted DESC (riskiest first)
+        default_rate = (
+            app_data.groupby(col)['TARGET']
+                    .mean()
+                    .sort_values(ascending=False)
+        ).reset_index(names=[col, 'TARGET'])
 
-    sns.barplot(
-        x=default_rate.index,
-        y=default_rate.values,
-        palette="viridis",
-        ax=ax_i
-    )
-    ax_i.set_xticklabels(ax_i.get_xticklabels(), rotation=45, ha='right', fontsize=8)
-    ax_i.set_title(f"Default Rate by {col}", fontsize=10)
-    ax_i.set_ylabel("Average TARGET (Default %)")
-    ax_i.set_xlabel(col.replace('_', ' ').title())
-    ax_i.grid(True, axis='y', linestyle='--', alpha=0.3)
+        default_rate['DefaultRate'] = (default_rate['TARGET'] * 100).round(2)
 
-# Hide any unused subplot (defensive, in case of fewer cols)
-for j in range(len(risk_columns), len(axes)):
-    fig_dem.delaxes(axes[j])
+        fig_tmp = px.bar(
+            default_rate,
+            x=col,
+            y='DefaultRate',
+            color='DefaultRate',
+            color_continuous_scale='Reds',
+            labels={
+                col: col.replace('_', ' ').title(),
+                'DefaultRate': 'Default rate (%)'
+            }
+        )
+        for trace in fig_tmp.data:
+            fig_dem.add_trace(trace, row=r, col=c)
 
-plt.tight_layout(pad=1.0)
-st.pyplot(fig_dem, width="content")   # behaves like other charts on zoom
+fig_dem.update_layout(
+    height=550,
+    showlegend=False,
+    title="Default Rate by Demographic Group (riskiest categories on the left)"
+)
+st.plotly_chart(fig_dem, width='stretch')
 
 st.markdown("""
 **Story:**
-- Bars are ordered from **highest** to **lowest** default rate for each demographic group.
-- Segments on the left of each plot are the **riskiest** categories within that feature.
+- Each subplot shows categories ordered from **highest** to **lowest** default rate, exactly as in the Colab EDA.
+- For income type, this ensures **Maternity leave** sits above **Unemployed**, matching the notebook’s analysis.
 """)
 
 st.markdown("---")
