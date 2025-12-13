@@ -89,8 +89,10 @@ for i, col in enumerate(risk_columns):
             app_data.groupby(col)['TARGET']
                     .mean()
                     .sort_values(ascending=False)
-        ).reset_index(names=[col, 'TARGET'])
+        ).reset_index()
 
+        # After reset_index columns are [col, 'TARGET']
+        default_rate.columns = [col, 'TARGET']
         default_rate['DefaultRate'] = (default_rate['TARGET'] * 100).round(2)
 
         fig_tmp = px.bar(
