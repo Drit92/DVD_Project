@@ -84,9 +84,9 @@ for i, col in enumerate(cat_cols):
         r += 1; c += 1
         tmp = df.groupby(col)['TARGET'].mean().reset_index()
         tmp['DefaultRate'] = (tmp['TARGET'] * 100).round(2)
-        tmp = tmp.sort_values('DefaultRate', ascending=True)  # ASCENDING bar height
+        tmp = tmp.sort_values('DefaultRate', ascending=True)
 
-        fig = px.bar(
+        fig_tmp = px.bar(
             tmp,
             x=col,
             y='DefaultRate',
@@ -94,7 +94,7 @@ for i, col in enumerate(cat_cols):
             color_continuous_scale='Reds',
             labels={col: col.replace('_', ' ').title(), 'DefaultRate': 'Default rate (%)'}
         )
-        for trace in fig.data:
+        for trace in fig_tmp.data:
             fig_dem.add_trace(trace, row=r, col=c)
 
 fig_dem.update_layout(
@@ -115,13 +115,10 @@ st.markdown("---")
 # === 2A. AGE DISTRIBUTION – DEFAULTERS ONLY ===
 st.header("📅 Age Profile of Defaulters")
 
-# Recreate defaulter-only cleaned dataset as in Colab
 df_def = df[df['TARGET'] == 1].copy()
-
-# AGE_YEARS already engineered; clip to a reasonable range
 df_def['AGE_YEARS'] = df_def['AGE_YEARS'].clip(lower=18, upper=80)
 
-fig_age, ax_age = plt.subplots(figsize=(8, 4))
+fig_age, ax_age = plt.subplots(figsize=(5, 3))
 
 sns.histplot(
     data=df_def,
@@ -134,12 +131,13 @@ sns.histplot(
     ax=ax_age
 )
 
-ax_age.set_title("Age Distribution of Defaulters", fontsize=13)
+ax_age.set_title("Age Distribution of Defaulters", fontsize=11)
 ax_age.set_xlabel("Age in years")
 ax_age.set_ylabel("Density")
 ax_age.grid(True, axis="y", linestyle="--", alpha=0.3)
+plt.tight_layout(pad=1.0)
 
-st.pyplot(fig_age, width="stretch")
+st.pyplot(fig_age, width="content")
 
 st.markdown("""
 **Story:**
@@ -149,9 +147,6 @@ st.markdown("""
 
 st.markdown("---")
 
-
-
-
 # === 3. FINANCIAL STRESS + TREND ===
 st.header("💰 Financial Stress – How Much Debt Is Too Much?")
 
@@ -159,7 +154,6 @@ col1, col2 = st.columns(2)
 
 with col1:
     credit_def = df.groupby('CREDIT_BIN', observed=True)['TARGET'].mean() * 100
-    # Sort x in logical ascending order by category
     credit_order = ['0-1x', '1-2x', '2-3x', '3-5x', '5x+']
     credit_def = credit_def.reindex(credit_order)
     fig_credit = px.bar(
@@ -225,7 +219,7 @@ bubble_final = pd.DataFrame({
     'Count': bubble_count
 }).reset_index()
 
-fig_bubble, ax = plt.subplots(figsize=(8, 5))
+fig_bubble, ax = plt.subplots(figsize=(5.5, 3.5))
 
 sns.scatterplot(
     data=bubble_final,
@@ -233,14 +227,14 @@ sns.scatterplot(
     y='DefaultRate',
     size='Count',
     hue='FLAG_EVER_REFUSED',
-    sizes=(50, 800),
+    sizes=(40, 400),
     palette={0: 'green', 1: 'red'},
     alpha=0.6,
     ax=ax,
     legend=False
 )
 
-ax.set_title("External Score vs Past Refusal (Bubble Size = Number of Customers)")
+ax.set_title("External Score vs Past Refusal (Bubble Size = Number of Customers)", fontsize=11)
 ax.set_xlabel("External score quartile (higher = safer)")
 ax.set_ylabel("Default rate (%)")
 ax.grid(True, which="both", axis="both", linestyle="--", alpha=0.4)
@@ -255,10 +249,13 @@ ax.legend(
     title="Refusal history",
     loc='upper left',
     bbox_to_anchor=(1.05, 1),
-    borderaxespad=0.
+    borderaxespad=0.,
+    fontsize=9,
+    title_fontsize=10
 )
 
-st.pyplot(fig_bubble, width="stretch")
+plt.tight_layout(pad=1.0)
+st.pyplot(fig_bubble, width="content")
 
 st.markdown("""
 **Story:**
@@ -354,11 +351,8 @@ fig_hist.update_traces(marker_line_width=1.5, marker_line_color='black')
 fig_hist.update_layout(
     height=500,
     legend_title="Default status",
-    legend=dict(
-        itemsizing="constant"
-    )
+    legend=dict(itemsizing="constant")
 )
-# Rename legend entries: 0 -> Good borrower, 1 -> Defaulter
 for trace in fig_hist.data:
     if trace.name == '0':
         trace.name = 'Good borrower (0)'
@@ -393,7 +387,7 @@ st.markdown("""
 
 st.markdown("---")
 
-# === 8. RADAR CHART – COLAB STYLE (RESIZED NEATLY) ===
+# === 8. RADAR CHART – COLAB STYLE, SMALLER ===
 st.header("📈 Risk Profile Comparison – Radar Chart")
 
 radar_cols = [
@@ -422,9 +416,8 @@ if len(radar_cols) >= 3:
     angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
     angles += angles[:1]
 
-    # Balanced size: not huge, not tiny
     fig_radar, ax_radar = plt.subplots(
-        figsize=(6, 6),              # medium square figure
+        figsize=(5, 5),
         subplot_kw=dict(polar=True)
     )
 
@@ -439,21 +432,20 @@ if len(radar_cols) >= 3:
         ax_radar.fill(angles, vals1, alpha=0.25, color='red')
 
     ax_radar.set_xticks(angles[:-1])
-    ax_radar.set_xticklabels(labels, fontsize=10)
+    ax_radar.set_xticklabels(labels, fontsize=9)
     ax_radar.set_ylim(0, 1)
     ax_radar.set_yticklabels([])
 
-    ax_radar.set_title("Risk Profile Comparison – Radar Chart", pad=25, fontsize=14)
+    ax_radar.set_title("Risk Profile Comparison – Radar Chart", pad=20, fontsize=13)
     ax_radar.legend(
-        bbox_to_anchor=(1.1, 1.05),
+        bbox_to_anchor=(1.05, 1.0),
         borderaxespad=0.,
-        fontsize=9,
-        title_fontsize=10
+        fontsize=8,
+        title_fontsize=9
     )
-    plt.tight_layout(pad=2.0)
+    plt.tight_layout(pad=1.2)
 
-    # Let Streamlit handle width to fit container
-    st.pyplot(fig_radar, width="stretch")
+    st.pyplot(fig_radar, width="content")
 
     st.markdown("""
     **Story:**
@@ -462,8 +454,6 @@ if len(radar_cols) >= 3:
     """)
 else:
     st.info("Not enough radar features available to draw the chart.")
-
-
 
 st.markdown("---")
 st.caption("Dashboard built for non‑technical users: each chart answers a simple question about loan risk.")
