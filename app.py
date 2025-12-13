@@ -22,15 +22,15 @@ def load_data():
 df = load_data()
 st.success(f"✅ Loaded {len(df):,} records | 🔴 Default Rate: {df['TARGET'].mean():.1%}")
 
-# === 1. DONUT CHART + METRICS ===
-st.header("📈 Portfolio Overview")
+# === 1. PORTFOLIO OVERVIEW ===
+st.header("📈 Portfolio Overview – Who Defaults?")
 col1, col2 = st.columns([1, 2])
 
 with col1:
     target_counts = df['TARGET'].value_counts()
     fig_donut = go.Figure(data=[
         go.Pie(
-            labels=['Non-Defaulter (0)', 'Defaulter (1)'],
+            labels=['Good borrower (0)', 'Defaulter (1)'],
             values=target_counts.values,
             hole=0.6,
             marker_colors=['#28a745', '#dc3545'],
@@ -40,70 +40,93 @@ with col1:
             showlegend=False
         )
     ])
-    fig_donut.update_layout(title="Loan Default Distribution", height=300, margin=dict(t=60))
+    fig_donut.update_layout(
+        title="Share of Good Borrowers vs Defaulters",
+        height=300,
+        margin=dict(t=60)
+    )
     st.plotly_chart(fig_donut, width='stretch')
 
 with col2:
     c1, c2, c3 = st.columns(3)
     c1.metric("Total Applicants", f"{len(df):,}")
-    c2.metric("Defaulters", f"{df['TARGET'].sum():,}", f"{df['TARGET'].mean():.1%}")
-    c3.metric("Good Borrowers", f"{(1-df['TARGET']).sum():,}")
+    c2.metric("Total Defaulters", f"{df['TARGET'].sum():,}", f"{df['TARGET'].mean():.1%}")
+    c3.metric("Total Good Borrowers", f"{(1-df['TARGET']).sum():,}")
 
 st.markdown("""
-**🔍 Insights:**
-- **92% Good Borrowers** vs **8% Defaulters** (highly imbalanced)
-- Need special handling for ML modeling (SMOTE/class weights)
+**Plain‑language story:**
+- Most customers repay on time; only a small share (about 8%) default.
+- Because defaulters are rare, any risk model must treat this as an imbalanced problem.
 """)
 
 st.markdown("---")
 
-# === 2. DEMOGRAPHICS ===
-st.header("👥 Risk by Demographics")
+# === 2. DEMOGRAPHICS – SORTED ASC ===
+st.header("👥 Demographic Segments – Who Is Riskier?")
+
 fig_dem = make_subplots(
     rows=2, cols=2,
-    subplot_titles=('Education', 'Income Type', 'Family Status', 'Housing'),
+    subplot_titles=('Education level', 'Type of income', 'Family status', 'Housing type'),
     specs=[[{"type": "bar"}, {"type": "bar"}],
            [{"type": "bar"}, {"type": "bar"}]]
 )
 
-cat_cols = ['NAME_EDUCATION_TYPE', 'NAME_INCOME_TYPE', 'NAME_FAMILY_STATUS', 'NAME_HOUSING_TYPE']
+cat_cols = [
+    'NAME_EDUCATION_TYPE',
+    'NAME_INCOME_TYPE',
+    'NAME_FAMILY_STATUS',
+    'NAME_HOUSING_TYPE'
+]
+
 for i, col in enumerate(cat_cols):
     if col in df.columns:
         r, c = divmod(i, 2)
         r += 1; c += 1
         tmp = df.groupby(col)['TARGET'].mean().reset_index()
-        tmp['TARGET'] = tmp['TARGET'] * 100
-        tmp = tmp.sort_values('TARGET', ascending=True)
-        fig_dem.add_trace(
-            px.bar(tmp, x=col, y='TARGET', color='TARGET',
-                   color_continuous_scale='Reds').data[0],
-            row=r, col=c
-        )
+        tmp['DefaultRate'] = (tmp['TARGET'] * 100).round(2)
+        tmp = tmp.sort_values('DefaultRate', ascending=True)  # ASCENDING bar height
 
-fig_dem.update_layout(height=550, showlegend=False, title="Default Rate by Demographics (%)")
+        fig = px.bar(
+            tmp,
+            x=col,
+            y='DefaultRate',
+            color='DefaultRate',
+            color_continuous_scale='Reds',
+            labels={col: col.replace('_', ' ').title(), 'DefaultRate': 'Default rate (%)'}
+        )
+        for trace in fig.data:
+            fig_dem.add_trace(trace, row=r, col=c)
+
+fig_dem.update_layout(
+    height=550,
+    showlegend=False,
+    title="Default Rate by Demographic Group (sorted from safest to riskiest)"
+)
 st.plotly_chart(fig_dem, width='stretch')
 
 st.markdown("""
-**🔍 Insights:**
-- **Education**: Lower secondary = 10.9% vs Academic degree = 1.8% (6x difference)
-- **Income**: Maternity/Unemployed = ~40% vs State servant = 5.8%
-- **Family**: Civil marriage/Single = ~10% vs Widow = 5.8%
-- **Housing**: Rented/Parents = 12% vs Owners = 7.8%
+**Story:**
+- Higher education, government income, being married, and owning a home are all linked to **safer borrowers**.
+- Lower education, unstable income and renting or living with parents increase default risk.
 """)
 
 st.markdown("---")
 
-# === 3. FINANCIAL STRESS + TREND LINE ===
-st.header("💰 Financial Stress Analysis")
+# === 3. FINANCIAL STRESS + TREND ===
+st.header("💰 Financial Stress – How Much Debt Is Too Much?")
+
 col1, col2 = st.columns(2)
 
 with col1:
     credit_def = df.groupby('CREDIT_BIN', observed=True)['TARGET'].mean() * 100
+    # Sort x in logical ascending order by category
+    credit_order = ['0-1x', '1-2x', '2-3x', '3-5x', '5x+']
+    credit_def = credit_def.reindex(credit_order)
     fig_credit = px.bar(
         x=credit_def.index.astype(str),
         y=credit_def.values,
-        title="Credit/Income Ratio vs Default Rate",
-        labels={'x': 'Credit/Income Multiple', 'y': 'Default Rate (%)'},
+        title="Default Rate by Credit / Income Multiple",
+        labels={'x': 'Credit amount as multiple of annual income', 'y': 'Default rate (%)'},
         color_discrete_sequence=['#dc3545']
     )
     fig_credit.update_yaxes(tickformat=".0%")
@@ -111,25 +134,30 @@ with col1:
 
 with col2:
     emi_def = df.groupby('EMI_BIN', observed=True)['TARGET'].mean() * 100
+    emi_order = ['<10%', '10-20%', '20-30%', '30-50%', '50%+']
+    emi_def = emi_def.reindex(emi_order)
     fig_emi = px.bar(
         x=emi_def.index.astype(str),
         y=emi_def.values,
-        title="EMI/Income Ratio vs Default Rate",
-        labels={'x': 'EMI as % of Income', 'y': 'Default Rate (%)'},
+        title="Default Rate by EMI / Income Percentage",
+        labels={'x': 'Monthly EMI as % of income', 'y': 'Default rate (%)'},
         color_discrete_sequence=['#fd7e14']
     )
     fig_emi.update_yaxes(tickformat=".0%")
     st.plotly_chart(fig_emi, width='stretch')
 
-st.subheader("📈 Default Trend Across Financial Stress")
+st.subheader("📈 Trend: Credit Stress vs Default Rate")
 trend_df = df.groupby('CREDIT_BIN', observed=True)['TARGET'].mean().reset_index()
+trend_df['TARGET'] = trend_df['TARGET'] * 100
+trend_df = trend_df.set_index('CREDIT_BIN').reindex(credit_order).reset_index()
+
 fig_trend = px.line(
     trend_df,
     x='CREDIT_BIN',
     y='TARGET',
     markers=True,
-    title="Default Rate Trend: Credit Stress Buckets",
-    labels={'CREDIT_BIN': 'Credit/Income Stress Group', 'TARGET': 'Default Rate (%)'},
+    title="Default Trend Across Credit / Income Buckets",
+    labels={'CREDIT_BIN': 'Credit / Income bucket', 'TARGET': 'Default rate (%)'},
     color_discrete_sequence=['#dc3545']
 )
 fig_trend.update_traces(line_shape='linear', marker=dict(size=10, color='#dc3545'))
@@ -137,19 +165,18 @@ fig_trend.update_yaxes(tickformat=".0%")
 st.plotly_chart(fig_trend, width='stretch')
 
 st.markdown("""
-**🔍 Insights:**
-- **Credit 3–5× income**: Highest default peak (~12%).
-- **EMI 10–20% of income**: Holds the largest share of defaulters.
-- Default risk rises steadily with financial pressure.
+**Story:**
+- When loans reach **3–5× annual income**, default risk jumps sharply.
+- EMIs above **20% of income** create serious repayment pressure.
+- Sensible policy: avoid approving loans above **4× income** and EMI above **25% of income**.
 """)
 
 st.markdown("---")
 
 # === 4. BUBBLE CHART (Seaborn/Matplotlib) ===
-st.header("🎯 External Score vs Behaviour – Bubble Plot")
+st.header("🎯 External Score + Past Refusal – Combined Risk")
 
 bubble_df = df[['EXT2_Q', 'FLAG_EVER_REFUSED', 'TARGET']].dropna()
-
 bubble_group = bubble_df.groupby(['EXT2_Q', 'FLAG_EVER_REFUSED'])['TARGET'].mean() * 100
 bubble_count = bubble_df.groupby(['EXT2_Q', 'FLAG_EVER_REFUSED'])['TARGET'].count()
 
@@ -160,7 +187,6 @@ bubble_final = pd.DataFrame({
 
 fig_bubble, ax = plt.subplots(figsize=(8, 5))
 
-# 0 -> No (green), 1 -> Yes (red)
 sns.scatterplot(
     data=bubble_final,
     x='EXT2_Q',
@@ -171,25 +197,22 @@ sns.scatterplot(
     palette={0: 'green', 1: 'red'},
     alpha=0.6,
     ax=ax,
-    legend=False   # turn off Seaborn's auto legend
+    legend=False
 )
 
-ax.set_title("External Score vs Behaviour – Bubble Plot (Size = # Customers)")
-ax.set_xlabel("External Score Quartile (Higher = Safer)")
-ax.set_ylabel("Default Rate (%)")
-
-# Grid lines back
+ax.set_title("External Score vs Past Refusal (Bubble Size = Number of Customers)")
+ax.set_xlabel("External score quartile (higher = safer)")
+ax.set_ylabel("Default rate (%)")
 ax.grid(True, which="both", axis="both", linestyle="--", alpha=0.4)
 
-# Custom legend with correct colors
 from matplotlib.patches import Patch
 legend_handles = [
-    Patch(facecolor='green', edgecolor='black', label='No'),
-    Patch(facecolor='red', edgecolor='black', label='Yes')
+    Patch(facecolor='green', edgecolor='black', label='No previous refusal'),
+    Patch(facecolor='red', edgecolor='black', label='Had previous refusal')
 ]
 ax.legend(
     handles=legend_handles,
-    title="Had Previous Refusal",
+    title="Refusal history",
     loc='upper left',
     bbox_to_anchor=(1.05, 1),
     borderaxespad=0.
@@ -198,25 +221,26 @@ ax.legend(
 st.pyplot(fig_bubble, width="stretch")
 
 st.markdown("""
-**🔍 Insights:**
-- Within each external‑score band, customers with **past refusals (“Yes”)** sit at higher default rates.
-- Large green bubbles in safer quartiles highlight stable, low‑risk customers.
+**Story:**
+- For the same external score, customers with a **past refusal** (red bubbles) default more.
+- The **largest safe group** is high external score + **no** refusal (big green bubbles on the right).
 """)
-
 
 st.markdown("---")
 
-# === 5. BEHAVIORAL RED FLAGS ===
-st.header("🚩 Behavioral Red Flags")
+# === 5. BEHAVIOURAL RED FLAGS ===
+st.header("🚩 Behavioural Red Flags – Past Actions Matter")
+
 col1, col2 = st.columns(2)
 
 with col1:
     refuse_def = df.groupby('FLAG_EVER_REFUSED')['TARGET'].mean() * 100
+    x_labels = ['No previous refusal', 'Had previous refusal']
     fig_refuse = px.bar(
-        x=['Never Refused', 'Had Refusal'],
-        y=refuse_def.values,
-        title="Previous Refusal History",
-        labels={'x': 'Refusal History', 'y': 'Default Rate (%)'},
+        x=x_labels,
+        y=refuse_def.reindex([0, 1]).values,
+        title="Default Rate by Refusal History",
+        labels={'x': 'Refusal history', 'y': 'Default rate (%)'},
         color_discrete_sequence=['#dc3545']
     )
     fig_refuse.update_yaxes(tickformat=".0%")
@@ -224,36 +248,39 @@ with col1:
 
 with col2:
     apps_def = df.groupby('PREV_APPS_BIN', observed=True)['TARGET'].mean() * 100
+    app_order = ['0', '1-2', '3-4', '5-9', '10+']
+    apps_def = apps_def.reindex(app_order)
     fig_apps = px.bar(
         x=apps_def.index.astype(str),
         y=apps_def.values,
-        title="Previous Applications",
-        labels={'x': 'Number of Previous Apps', 'y': 'Default Rate (%)'},
+        title="Default Rate by Number of Previous Applications",
+        labels={'x': 'Number of previous applications', 'y': 'Default rate (%)'},
         color_discrete_sequence=['#e83e8c']
     )
     fig_apps.update_yaxes(tickformat=".0%")
     st.plotly_chart(fig_apps, width='stretch')
 
 st.markdown("""
-**🔍 Insights:**
-- Customers with **past refusals** default much more often than those without.
-- **10+ previous applications** is a strong stress signal and should trigger manual review.
+**Story:**
+- Customers who were **refused in the past** are noticeably more likely to default now.
+- Risk is lowest for people with **0–4 past applications**, and rises for **5+**, especially **10+**.
 """)
 
 st.markdown("---")
 
 # === 6. EXTERNAL CREDIT SCORES ===
-st.header("⭐ External Credit Scores")
+st.header("⭐ External Credit Scores – Power of Bureau Data")
 
 col1, col2 = st.columns([2, 1])
 
 with col1:
     ext2_def = df.groupby('EXT2_Q')['TARGET'].mean() * 100
+    ext2_def = ext2_def.reindex(['Q1 (low)', 'Q2', 'Q3', 'Q4 (high)'])
     fig_ext2 = px.bar(
         x=ext2_def.index.astype(str),
         y=ext2_def.values,
-        title="EXT_SOURCE_2 Quartiles",
-        labels={'x': 'External Score Quartile', 'y': 'Default Rate (%)'},
+        title="Default Rate by External Score Quartile",
+        labels={'x': 'External score quartile', 'y': 'Default rate (%)'},
         color_discrete_sequence=['#6f42c1']
     )
     fig_ext2.update_yaxes(tickformat=".0%")
@@ -261,10 +288,10 @@ with col1:
 
 with col2:
     st.markdown("""
-    **🔍 Insights:**
-    - Lowest external‑score quartile shows **~4×** higher default rate than the top quartile.
-    - Risk decreases smoothly as the external score improves.
-    - External bureau scores are a very strong screening signal.
+    **Story:**
+    - The **lowest score band (Q1)** has roughly **four times** the default rate of the **highest band (Q4)**.
+    - As the external score improves, default risk **falls smoothly**.
+    - These scores are extremely useful for early screening.
     """)
 
 st.markdown("---")
@@ -275,44 +302,68 @@ fig_hist = px.histogram(
     color='TARGET',
     nbins=50,
     marginal='violin',
-    title="EXT_SOURCE_2 Distribution by Default Status",
-    labels={'EXT_SOURCE_2': 'External Credit Score', 'count': 'Number of Applicants'},
-    color_discrete_map={0: '#28a745', 1: '#dc3545'}
+    title="Distribution of External Scores for Good Borrowers vs Defaulters",
+    labels={
+        'EXT_SOURCE_2': 'External credit score',
+        'count': 'Number of applicants',
+        'TARGET': 'Default status'
+    },
+    color_discrete_map={0: '#28a745', 1: '#dc3545'},
 )
 fig_hist.update_traces(marker_line_width=1.5, marker_line_color='black')
-fig_hist.update_layout(height=500, legend_title="Default Status")
+fig_hist.update_layout(
+    height=500,
+    legend_title="Default status",
+    legend=dict(
+        itemsizing="constant"
+    )
+)
+# Rename legend entries: 0 -> Good borrower, 1 -> Defaulter
+for trace in fig_hist.data:
+    if trace.name == '0':
+        trace.name = 'Good borrower (0)'
+    elif trace.name == '1':
+        trace.name = 'Defaulter (1)'
+
 st.plotly_chart(fig_hist, width='stretch')
 
 st.markdown("---")
 
 # === 7. COMBINED RISK SCORE ===
-st.header("🎯 Combined Risk Score")
+st.header("🎯 Combined Risk Score – One Number to Rank Risk")
+
 risk_def = df.groupby('RISK_SCORE')['TARGET'].mean() * 100
+risk_def = risk_def.sort_index()
+
 fig_risk = px.bar(
     x=risk_def.index.astype(str),
     y=risk_def.values,
-    title="Default Rate by Composite Risk Score",
-    labels={'x': 'Risk Score (0=Safe, Higher=Riskier)', 'y': 'Default Rate (%)'},
+    title="Default Rate by Combined Risk Score",
+    labels={'x': 'Risk score (0 = safest, higher = riskier)', 'y': 'Default rate (%)'},
     color_discrete_sequence=['#fd7e14']
 )
 fig_risk.update_yaxes(tickformat=".0%")
 st.plotly_chart(fig_risk, width='stretch')
 
 st.markdown("""
-**🔍 Insights:**
-- Low scores capture the **safest** segments.
-- High scores concentrate the **worst‑risk** applicants.
-- The score can be used directly as a decision or pricing band.
+**Story:**
+- Low scores group the **safest** customers; high scores gather the **riskiest**.
+- This single score can drive **approval thresholds, pricing tiers, or watchlists**.
 """)
 
 st.markdown("---")
 
 # === 8. RADAR CHART ===
-st.header("📈 Risk Profile Comparison")
-st.markdown("*Defaulters (🔴) vs Non‑Defaulters (🟢) across multiple risk dimensions*")
+st.header("📈 Overall Risk Profile – Side‑by‑Side View")
 
-radar_cols = ['CREDIT_INCOME_RATIO', 'ANNUITY_INCOME_RATIO', 'FLAG_EVER_REFUSED',
-              'EXT_SOURCE_2', 'AGE_YEARS', 'INCOME_PER_PERSON']
+radar_cols = [
+    'CREDIT_INCOME_RATIO',
+    'ANNUITY_INCOME_RATIO',
+    'FLAG_EVER_REFUSED',
+    'EXT_SOURCE_2',
+    'AGE_YEARS',
+    'INCOME_PER_PERSON'
+]
 radar_cols = [c for c in radar_cols if c in df.columns]
 
 if len(radar_cols) >= 3:
@@ -326,30 +377,47 @@ if len(radar_cols) >= 3:
     radar_norm = radar_norm.astype(float)
 
     fig_radar = go.Figure()
-    values0 = radar_norm[0].tolist() + radar_norm[0].tolist()[:1]
+    vals0 = radar_norm[0].tolist() + radar_norm[0].tolist()[:1]
+    vals1 = radar_norm[1].tolist() + radar_norm[1].tolist()[:1]
+
     fig_radar.add_trace(go.Scatterpolar(
-        r=values0, theta=radar_cols + [radar_cols[0]],
-        fill='toself', name='🟢 Non-Defaulters',
-        line_color='green', line=dict(width=4), fillcolor='rgba(0,255,0,0.2)'
+        r=vals0,
+        theta=[c.replace('_', ' ').title() for c in radar_cols] + [radar_cols[0].replace('_', ' ').title()],
+        fill='toself',
+        name='Good borrowers (0)',
+        line_color='green',
+        line=dict(width=4),
+        fillcolor='rgba(0,255,0,0.2)'
     ))
-    values1 = radar_norm[1].tolist() + radar_norm[1].tolist()[:1]
     fig_radar.add_trace(go.Scatterpolar(
-        r=values1, theta=radar_cols + [radar_cols[0]],
-        fill='toself', name='🔴 Defaulters',
-        line_color='red', line=dict(width=4), fillcolor='rgba(255,0,0,0.2)'
+        r=vals1,
+        theta=[c.replace('_', ' ').title() for c in radar_cols] + [radar_cols[0].replace('_', ' ').title()],
+        fill='toself',
+        name='Defaulters (1)',
+        line_color='red',
+        line=dict(width=4),
+        fillcolor='rgba(255,0,0,0.2)'
     ))
+
     fig_radar.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, 1],
-                                   tickvals=[0, 0.2, 0.4, 0.6, 0.8, 1.0])),
-        showlegend=True, title="Risk Profile Comparison", height=650
+        title="Normalized Risk Profile – Good Borrowers vs Defaulters",
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 1],
+                tickvals=[0, 0.25, 0.5, 0.75, 1.0]
+            )
+        ),
+        showlegend=True,
+        height=650
     )
     st.plotly_chart(fig_radar, width='stretch')
 
     st.markdown("""
-    **🔍 Insights:**
-    - Defaulters sit at **higher stress and weaker scores** on most axes.
-    - Non‑defaulters show **lower leverage, higher income and age**, and better external scores.
+    **Story:**
+    - Defaulters carry **higher debt loads**, more refusals and weaker external scores.
+    - Good borrowers are **older, better‑scored and less leveraged**.
     """)
 
 st.markdown("---")
-st.caption("🎉 Production dashboard | 50k sample | Auto-download from Google Drive")
+st.caption("Dashboard built for non‑technical users: each chart answers a simple question about loan risk.")
