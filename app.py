@@ -47,7 +47,7 @@ with col1:
         height=260,
         margin=dict(t=40, b=10)
     )
-    st.plotly_chart(fig_donut, use_container_width=True)
+    st.plotly_chart(fig_donut, width='stretch')
 
 with col2:
     c1, c2, c3 = st.columns(3)
@@ -89,7 +89,7 @@ with col1:
         margin=dict(t=40, l=10, r=10, b=10),
         height=260
     )
-    st.plotly_chart(fig_gender_pie, use_container_width=True)
+    st.plotly_chart(fig_gender_pie, width='stretch')
 
 # Overall age distribution
 with col2:
@@ -104,7 +104,7 @@ with col2:
     )
     fig_age_all.update_traces(marker_line_width=1.2, marker_line_color='black')
     fig_age_all.update_layout(height=260)
-    st.plotly_chart(fig_age_all, use_container_width=True)
+    st.plotly_chart(fig_age_all, width='stretch')
 
 st.markdown("""
 **Insights:**
@@ -170,7 +170,7 @@ fig_dem.update_layout(
     title="Default Rate by Demographic Group (safest → riskiest)",
     margin=dict(l=30, r=30, t=70, b=40)
 )
-st.plotly_chart(fig_dem, use_container_width=True)
+st.plotly_chart(fig_dem, width='stretch')
 
 st.markdown("""
 **Insights:**
@@ -193,7 +193,7 @@ fig_age_def = px.histogram(
 )
 fig_age_def.update_traces(marker_line_width=1.2, marker_line_color='black')
 fig_age_def.update_layout(height=260)
-st.plotly_chart(fig_age_def, use_container_width=True)
+st.plotly_chart(fig_age_def, width='stretch')
 
 st.markdown("""
 **Insight:** Most defaulters are between **about 28 and 45 years old**; default risk tapers off for older customers who tend to have more stable finances.
@@ -220,7 +220,7 @@ fig_trend = px.line(
 )
 fig_trend.update_traces(line_shape='linear', marker=dict(size=8))
 fig_trend.update_yaxes(ticksuffix="%")
-st.plotly_chart(fig_trend, use_container_width=True)
+st.plotly_chart(fig_trend, width='stretch')
 
 st.markdown("""
 **Insights:**
@@ -232,9 +232,23 @@ st.markdown("---")
 # === 4. BUBBLE CHART – EXTERNAL SCORE vs REFUSAL (NON‑OVERLAPPING) ===
 st.header("🎯 External Score + Past Refusal – Combined Risk")
 
-bubble_df = df[['EXT2_Q', 'FLAG_EVER_REFUSED', 'TARGET']].dropna()
-bubble_group = bubble_df.groupby(['EXT2_Q', 'FLAG_EVER_REFUSED'])['TARGET'].mean() * 100
-bubble_count = bubble_df.groupby(['EXT2_Q', 'FLAG_EVER_REFUSED'])['TARGET'].count()
+# Assume EXT2_Q_NUM (1–4) exists alongside pretty labels EXT2_Q; if not, derive it
+if 'EXT2_Q_NUM' in df.columns:
+    bubble_src = df[['EXT2_Q', 'EXT2_Q_NUM', 'FLAG_EVER_REFUSED', 'TARGET']].dropna()
+else:
+    # Fallback: map pretty labels like "Q1 (low)" → 1, etc.
+    label_to_num = {
+        'Q1 (low)': 1,
+        'Q2': 2,
+        'Q3': 3,
+        'Q4 (high)': 4
+    }
+    tmp = df[['EXT2_Q', 'FLAG_EVER_REFUSED', 'TARGET']].dropna().copy()
+    tmp['EXT2_Q_NUM'] = tmp['EXT2_Q'].map(label_to_num)
+    bubble_src = tmp.dropna(subset=['EXT2_Q_NUM'])
+
+bubble_group = bubble_src.groupby(['EXT2_Q_NUM', 'FLAG_EVER_REFUSED'])['TARGET'].mean() * 100
+bubble_count = bubble_src.groupby(['EXT2_Q_NUM', 'FLAG_EVER_REFUSED'])['TARGET'].count()
 
 bubble_final = pd.DataFrame({
     'DefaultRate': bubble_group,
@@ -242,7 +256,6 @@ bubble_final = pd.DataFrame({
 }).reset_index()
 
 offset_map = {0: -0.12, 1: 0.12}
-bubble_final['EXT2_Q_NUM'] = bubble_final['EXT2_Q'].astype(int)
 bubble_final['x_pos'] = bubble_final['EXT2_Q_NUM'] + bubble_final['FLAG_EVER_REFUSED'].map(offset_map)
 
 fig_bubble = px.scatter(
@@ -268,7 +281,7 @@ fig_bubble.update_xaxes(
     ticktext=[f"Q{q}" for q in quartile_ticks]
 )
 fig_bubble.update_yaxes(ticksuffix="%")
-st.plotly_chart(fig_bubble, use_container_width=True)
+st.plotly_chart(fig_bubble, width='stretch')
 
 st.markdown("""
 **Insights:**
@@ -292,7 +305,7 @@ with col1:
         color_discrete_sequence=['#dc3545']
     )
     fig_refuse.update_yaxes(ticksuffix="%")
-    st.plotly_chart(fig_refuse, use_container_width=True)
+    st.plotly_chart(fig_refuse, width='stretch')
 
 with col2:
     apps_def = df.groupby('PREV_APPS_BIN', observed=True)['TARGET'].mean() * 100
@@ -306,7 +319,7 @@ with col2:
         color_discrete_sequence=['#e83e8c']
     )
     fig_apps.update_yaxes(ticksuffix="%")
-    st.plotly_chart(fig_apps, use_container_width=True)
+    st.plotly_chart(fig_apps, width='stretch')
 
 st.markdown("""
 **Insights:**
@@ -331,7 +344,7 @@ with col1:
         color_discrete_sequence=['#6f42c1']
     )
     fig_ext2.update_yaxes(ticksuffix="%")
-    st.plotly_chart(fig_ext2, use_container_width=True)
+    st.plotly_chart(fig_ext2, width='stretch')
 
 with col2:
     st.markdown("""
@@ -358,7 +371,7 @@ for trace in fig_hist.data:
         trace.name = 'Good borrower (0)'
     elif trace.name == '1':
         trace.name = 'Defaulter (1)'
-st.plotly_chart(fig_hist, use_container_width=True)
+st.plotly_chart(fig_hist, width='stretch')
 
 st.markdown("---")
 
@@ -388,7 +401,7 @@ fig_risk = px.bar(
     color_discrete_sequence=['#fd7e14']
 )
 fig_risk.update_yaxes(ticksuffix="%")
-st.plotly_chart(fig_risk, use_container_width=True)
+st.plotly_chart(fig_risk, width='stretch')
 
 st.markdown("""
 **Insight:** Low scores capture the **safest borrowers**, while high scores group together the **riskiest applicants**, so this single score can drive cut‑offs, pricing bands and watchlists.
@@ -406,7 +419,7 @@ radar_cols = [
     'AGE_YEARS',
     'AMT_INCOME_TOTAL'
 ]
-radar_cols = [c for c in radar_cols if c in df.columns]
+radar_cols = [c for c in df.columns if c in radar_cols]
 
 if len(radar_cols) >= 3:
     radar_data = df.groupby('TARGET')[radar_cols].mean().T
@@ -440,7 +453,7 @@ if len(radar_cols) >= 3:
     ax_radar.legend(bbox_to_anchor=(1.05, 1.0), borderaxespad=0., fontsize=7)
     plt.tight_layout(pad=0.8)
 
-    st.pyplot(fig_radar, use_container_width=False)
+    st.pyplot(fig_radar, width='content')
 
     st.markdown("""
     **Insight:** The red shape (defaulters) bulges where debt burdens and refusals are higher and external scores weaker, while the green shape (non‑defaulters) shows lower leverage and stronger scores.
