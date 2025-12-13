@@ -46,9 +46,11 @@ with col1:
     st.plotly_chart(fig_donut, width='stretch')
 
 with col2:
-    col1.metric("Total Applicants", f"{len(df):,}")
-    col2.metric("Defaulters", f"{df['TARGET'].sum():,}", f"{df['TARGET'].mean():.1%}")
-    col3.metric("Good Borrowers", f"{(1-df['TARGET']).sum():,}")
+    # 3 metrics in sub-columns
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total Applicants", f"{len(df):,}")
+    c2.metric("Defaulters", f"{df['TARGET'].sum():,}", f"{df['TARGET'].mean():.1%}")
+    c3.metric("Good Borrowers", f"{(1-df['TARGET']).sum():,}")
 
 st.markdown("""
 **🔍 Insights:**
