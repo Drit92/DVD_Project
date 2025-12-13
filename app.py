@@ -19,34 +19,28 @@ def load_data():
 df = load_data()
 st.success(f"✅ Loaded {len(df):,} records | 🔴 Default Rate: {df['TARGET'].mean():.1%}")
 
-# === 1. DONUT CHART (NEW - Target Distribution) ===
+# === 1. DONUT CHART + METRICS ===
 st.header("📈 Portfolio Overview")
 col1, col2 = st.columns([1, 2])
 
 with col1:
-    # Donut chart - Reddish for defaulters, Greenish for non-defaulters
     target_counts = df['TARGET'].value_counts()
     fig_donut = go.Figure(data=[
         go.Pie(
             labels=['Non-Defaulter (0)', 'Defaulter (1)'],
             values=target_counts.values,
             hole=0.6,
-            marker_colors=['#28a745', '#dc3545'],  # Green, Red
+            marker_colors=['#28a745', '#dc3545'],
             textinfo='label+percent',
             textposition='outside',
             textfont_size=14,
             showlegend=False
         )
     ])
-    fig_donut.update_layout(
-        title="Loan Default Distribution",
-        height=300,
-        margin=dict(t=60)
-    )
+    fig_donut.update_layout(title="Loan Default Distribution", height=300, margin=dict(t=60))
     st.plotly_chart(fig_donut, width='stretch')
 
 with col2:
-    # 3 metrics in sub-columns
     c1, c2, c3 = st.columns(3)
     c1.metric("Total Applicants", f"{len(df):,}")
     c2.metric("Defaulters", f"{df['TARGET'].sum():,}", f"{df['TARGET'].mean():.1%}")
@@ -60,7 +54,7 @@ st.markdown("""
 
 st.markdown("---")
 
-# === 2. DEMOGRAPHICS (Sorted Highest to Lowest) ===
+# === 2. DEMOGRAPHICS ===
 st.header("👥 Risk by Demographics")
 fig_dem = make_subplots(rows=2, cols=2, 
                        subplot_titles=('Education', 'Income Type', 'Family Status', 'Housing'),
@@ -73,10 +67,10 @@ for i, col in enumerate(cat_cols):
         r += 1; c += 1
         tmp = df.groupby(col)['TARGET'].mean().reset_index()
         tmp['TARGET'] = tmp['TARGET'] * 100
-        tmp = tmp.sort_values('TARGET', ascending=True)  # HIGHEST TO LOWEST
+        tmp = tmp.sort_values('TARGET', ascending=True)
         fig_dem.add_trace(
             px.bar(tmp, x=col, y='TARGET', color='TARGET', 
-                   color_continuous_scale='Reds').data[0],  # Red palette
+                   color_continuous_scale='Reds').data[0], 
             row=r, col=c
         )
 
@@ -84,7 +78,7 @@ fig_dem.update_layout(height=550, showlegend=False, title="Default Rate by Demog
 st.plotly_chart(fig_dem, width='stretch')
 
 st.markdown("""
-**🔍 Insights (Colab exact):**
+**🔍 Insights:**
 - **Education**: Lower secondary = 10.9% vs Academic degree = 1.8% (6x difference)
 - **Income**: Maternity/Unemployed = ~40% vs State servant = 5.8%
 - **Family**: Civil marriage/Single = ~10% vs Widow = 5.8%
@@ -93,7 +87,7 @@ st.markdown("""
 
 st.markdown("---")
 
-# === 3. FINANCIAL STRESS (Proper Labels) ===
+# === 3. FINANCIAL STRESS + TREND LINE ===
 st.header("💰 Financial Stress Analysis")
 col1, col2 = st.columns(2)
 
@@ -121,16 +115,74 @@ with col2:
     fig_emi.update_yaxes(tickformat=".0%")
     st.plotly_chart(fig_emi, width='stretch')
 
+# NEW: Trend Line (Cell 17)
+st.subheader("📈 Default Trend Across Financial Stress")
+trend_df = df.groupby('CREDIT_BIN', observed=True)['TARGET'].mean().reset_index()
+fig_trend = px.line(
+    trend_df, 
+    x='CREDIT_BIN', 
+    y='TARGET',
+    markers=True,
+    title="Default Rate Trend: Credit Stress Buckets",
+    labels={'CREDIT_BIN': 'Credit/Income Stress Group', 'TARGET': 'Default Rate (%)'},
+    color_discrete_sequence=['#dc3545']
+)
+fig_trend.update_traces(line_shape='linear', marker=dict(size=10, color='#dc3545'))
+fig_trend.update_yaxes(tickformat=".0%")
+st.plotly_chart(fig_trend, width='stretch')
+
 st.markdown("""
-**🔍 Insights (Colab exact):**
+**🔍 Insights:**
 - **Credit 3-5x income**: Highest default peak (~12%)
 - **EMI 10-20% income**: 47% of defaulters (moderate stress = biggest risk)
-- **Rule**: Reject loans >4x income, EMI >25% income
+- **Trend**: Default risk increases steadily with financial pressure
 """)
 
 st.markdown("---")
 
-# === 4. BEHAVIORAL RED FLAGS (Reddish colors only) ===
+# === 4. BUBBLE CHART (NEW - Cell 18) ===
+st.header("🎯 External Score vs Behavioral Risk")
+bubble_df = df[['EXT2_Q', 'FLAG_EVER_REFUSED', 'TARGET']].dropna()
+
+bubble_group = bubble_df.groupby(['EXT2_Q', 'FLAG_EVER_REFUSED'])['TARGET'].mean() * 100
+bubble_count = bubble_df.groupby(['EXT2_Q', 'FLAG_EVER_REFUSED'])['TARGET'].count()
+
+bubble_final = pd.DataFrame({
+    'DefaultRate': bubble_group,
+    'Count': bubble_count,
+    'EXT2_Q': bubble_group.index.get_level_values(0),
+    'FLAG_EVER_REFUSED': bubble_group.index.get_level_values(1)
+}).reset_index(drop=True)
+
+fig_bubble = px.scatter(
+    bubble_final,
+    x='EXT2_Q',
+    y='DefaultRate',
+    size='Count',
+    size_max=60,
+    color='FLAG_EVER_REFUSED',
+    color_continuous_scale=['#28a745', '#dc3545'],
+    title="External Score vs Behavior (Bubble Size = # Customers)",
+    labels={
+        'EXT2_Q': 'External Score Quartile (Higher = Safer)',
+        'DefaultRate': 'Default Rate (%)',
+        'Count': 'Customer Count'
+    },
+    hover_data=['Count']
+)
+fig_bubble.update_traces(opacity=0.8)
+st.plotly_chart(fig_bubble, width='stretch')
+
+st.markdown("""
+**🔍 Insights:**
+- **Large bubbles** = high customer volume
+- **Low EXT scores + prior refusals** = highest risk combinations
+- **Size shows scale**: Low-score refused customers most dangerous
+""")
+
+st.markdown("---")
+
+# === 5. BEHAVIORAL RED FLAGS ===
 st.header("🚩 Behavioral Red Flags")
 col1, col2 = st.columns(2)
 
@@ -141,7 +193,7 @@ with col1:
         y=refuse_def.values,
         title="Previous Refusal History",
         labels={'x': 'Refusal History', 'y': 'Default Rate (%)'},
-        color_discrete_sequence=['#dc3545']  # Red only
+        color_discrete_sequence=['#dc3545']
     )
     fig_refuse.update_yaxes(tickformat=".0%")
     st.plotly_chart(fig_refuse, width='stretch')
@@ -153,13 +205,13 @@ with col2:
         y=apps_def.values,
         title="Previous Applications", 
         labels={'x': 'Number of Previous Apps', 'y': 'Default Rate (%)'},
-        color_discrete_sequence=['#e83e8c']  # Reddish
+        color_discrete_sequence=['#e83e8c']
     )
     fig_apps.update_yaxes(tickformat=".0%")
     st.plotly_chart(fig_apps, width='stretch')
 
 st.markdown("""
-**🔍 Insights (Colab exact):**
+**🔍 Insights:**
 - **Previous refusal**: 10.3% vs 7% (48% higher risk)
 - **10+ applications**: 9.9% default (credit shopping = stress signal)
 - **Rule**: Manual review for refused history, reject 10+ apps
@@ -167,7 +219,7 @@ st.markdown("""
 
 st.markdown("---")
 
-# === 5. EXTERNAL CREDIT SCORES (Full-width histogram) ===
+# === 6. EXTERNAL CREDIT SCORES ===
 st.header("⭐ External Credit Scores")
 col1, col2 = st.columns(2)
 
@@ -184,7 +236,6 @@ with col1:
     st.plotly_chart(fig_ext2, width='stretch')
 
 with col2:
-    # FULL WIDTH HISTOGRAM with outlines + clear legend
     fig_hist = px.histogram(
         df, 
         x='EXT_SOURCE_2', 
@@ -193,24 +244,14 @@ with col2:
         marginal='violin',
         title="EXT_SOURCE_2 Distribution by Default Status",
         labels={'EXT_SOURCE_2': 'External Credit Score', 'count': 'Number of Applicants'},
-        category_orders={'TARGET': [0, 1]}
+        color_discrete_map={0: '#28a745', 1: '#dc3545'}
     )
-    fig_hist.update_traces(
-        marker_line_width=1.5,  # VISIBLE BORDERS
-        marker_line_color='black'
-    )
-    fig_hist.update_layout(
-        legend=dict(
-            title="Default Status",
-            entries=[dict(label="Non-Defaulter (0)", color="#28a745"),
-                     dict(label="Defaulter (1)", color="#dc3545")]
-        ),
-        height=400
-    )
+    fig_hist.update_traces(marker_line_width=1.5, marker_line_color='black')
+    fig_hist.update_layout(height=450, legend_title="Default Status")
     st.plotly_chart(fig_hist, width='stretch')
 
 st.markdown("""
-**🔍 Insights (Colab exact):**
+**🔍 Insights:**
 - **Q1 (lowest scores)**: 12% default vs **Q4 (highest)**: 3%
 - **Monotonic gradient**: Higher external scores = exponentially safer
 - External bureaus are **gold standard** predictor
@@ -218,7 +259,7 @@ st.markdown("""
 
 st.markdown("---")
 
-# === 6. COMBINED RISK SCORE ===
+# === 7. COMBINED RISK SCORE ===
 st.header("🎯 Combined Risk Score")
 risk_def = df.groupby('RISK_SCORE')['TARGET'].mean() * 100
 fig_risk = px.bar(
@@ -232,7 +273,7 @@ fig_risk.update_yaxes(tickformat=".0%")
 st.plotly_chart(fig_risk, width='stretch')
 
 st.markdown("""
-**🔍 Insights (Colab exact):**
+**🔍 Insights:**
 - **Risk Score 0**: Safest bucket
 - **Risk Score 6+**: Extreme danger zone
 - **Perfect stratification**: Higher score = exponentially higher default
@@ -240,11 +281,10 @@ st.markdown("""
 
 st.markdown("---")
 
-# === 7. RADAR CHART (Keep your working version) ===
+# === 8. RADAR CHART ===
 st.header("📈 Risk Profile Comparison")
-st.markdown("*Exact replica of Colab radar - Defaulters (🔴) vs Non-Defaulters (🟢)*")
+st.markdown("*Defaulters (🔴) vs Non-Defaulters (🟢) across 6 risk dimensions*")
 
-# [YOUR WORKING RADAR CODE FROM PREVIOUS MESSAGE - KEEP AS IS]
 radar_cols = ['CREDIT_INCOME_RATIO', 'ANNUITY_INCOME_RATIO', 'FLAG_EVER_REFUSED', 
               'EXT_SOURCE_2', 'AGE_YEARS', 'INCOME_PER_PERSON']
 radar_cols = [c for c in radar_cols if c in df.columns]
@@ -263,7 +303,6 @@ if len(radar_cols) >= 3:
     
     fig_radar = go.Figure()
     
-    # Non-Defaulters (Green)
     values0 = radar_norm[0].tolist() + radar_norm[0].tolist()[:1]
     fig_radar.add_trace(go.Scatterpolar(
         r=values0, theta=radar_cols + [radar_cols[0]],
@@ -271,7 +310,6 @@ if len(radar_cols) >= 3:
         line_color='green', line=dict(width=4), fillcolor='rgba(0,255,0,0.2)'
     ))
     
-    # Defaulters (Red)
     values1 = radar_norm[1].tolist() + radar_norm[1].tolist()[:1]
     fig_radar.add_trace(go.Scatterpolar(
         r=values1, theta=radar_cols + [radar_cols[0]],
@@ -286,11 +324,11 @@ if len(radar_cols) >= 3:
     st.plotly_chart(fig_radar, width='stretch')
     
     st.markdown("""
-    **🔍 Insights (Colab exact):**
+    **🔍 Insights:**
     - Defaulters cluster in **high stress/low score** zone
     - Non-defaulters have **balanced low-risk profile**
     - Each spoke normalized separately (0=best, 1=worst per feature)
     """)
 
 st.markdown("---")
-st.caption("🎉 All charts match Colab exactly | 50k sample | Auto-download from Google Drive")
+st.caption("🎉 Production dashboard | 50k sample | Auto-download from Google Drive")
