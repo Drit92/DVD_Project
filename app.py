@@ -212,8 +212,8 @@ st.header("👥 Demographic Segments – Who Is Riskier?")
 fig_dem = make_subplots(
     rows=2,
     cols=2,
-    horizontal_spacing=0.12,   # more gap horizontally
-    vertical_spacing=0.25,     # more gap vertically (was 0.18)
+    horizontal_spacing=0.16,   # wider horizontal gap
+    vertical_spacing=0.32,     # wider vertical gap
     subplot_titles=(
         "Education level",
         "Type of income",
@@ -237,6 +237,11 @@ for col, (r, c) in demo_mapping.items():
         continue
 
     df_demo = df_demo.copy()
+
+    # Drop "Unknown" only for family status
+    if col == "NAME_FAMILY_STATUS":
+        df_demo = df_demo[df_demo[col] != "Unknown"]
+
     df_demo["DefaultRate"] = (df_demo["DefaultRate"] * 100).round(2)
     df_demo = df_demo.sort_values("DefaultRate", ascending=False)
 
@@ -251,9 +256,8 @@ for col, (r, c) in demo_mapping.items():
             "DefaultRate": "Default rate (%)",
         },
     )
-    # tighten inner plot margins so subplots don't bleed into each other
     fig_tmp.update_layout(
-        margin=dict(t=40, b=40, l=40, r=40),
+        margin=dict(t=30, b=50, l=40, r=40),   # tighter inner margins
         xaxis=dict(tickangle=-35),
         coloraxis_showscale=False,
     )
@@ -262,10 +266,10 @@ for col, (r, c) in demo_mapping.items():
         fig_dem.add_trace(trace, row=r, col=c)
 
 fig_dem.update_layout(
-    height=650,                              # a bit taller
+    height=720,                               # a bit taller
     showlegend=False,
     title="Default Rate by Demographic Group (riskiest categories on the left)",
-    margin=dict(l=50, r=50, t=80, b=50),     # outer margins
+    margin=dict(l=60, r=60, t=90, b=60),      # bigger outer margins
     transition_duration=0,
 )
 
