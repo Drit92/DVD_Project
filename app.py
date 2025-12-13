@@ -450,7 +450,7 @@ if len(radar_cols) >= 3:
     ax_radar.legend(bbox_to_anchor=(1.25, 1.1))
     plt.tight_layout()
 
-    st.pyplot(fig_radar, width="content")
+    st.pyplot(fig_radar, width="stretch")
 
     st.markdown("""
     **Story:**
