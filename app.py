@@ -709,7 +709,7 @@ else:
 
     # 4x4 inch figure with polar axis
     fig_radar, ax_radar = plt.subplots(
-        figsize=(7, 7),
+        figsize=(12, 12),
         subplot_kw=dict(polar=True),
         dpi=100,
     )
