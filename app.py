@@ -398,46 +398,40 @@ credit_default = get_agg("credit_default").copy()
 if credit_default.empty:
     st.info("Credit / income default aggregate not available.")
 else:
-    # Inspect once if needed
-    # st.write(credit_default)
-
-    # Clean: drop NaN bins and keep only known labels
-    valid_bins = ["0-1x", "1-2x", "2-3x", "3-5x", "5x+"]
+    # Remove NaN bin and keep bins in the expected order
+    valid_bins = ["0–1x", "1–2x", "2–3x", "3–5x", "5x+"]  # or "0-1x" etc. to match your labels
     credit_default = credit_default.dropna(subset=["CREDIT_BIN"])
     credit_default = credit_default[credit_default["CREDIT_BIN"].isin(valid_bins)]
 
-    # If after cleaning there are fewer than 2 points, show a message
-    if len(credit_default) < 2:
-        st.info("Not enough non‑empty credit bins to draw a trend line.")
-    else:
-        # Ensure numeric y
-        credit_default["DefaultRate"] = credit_default["DefaultRate"].astype(float) * 100
+    # Convert to percentage
+    credit_default["DefaultRate"] = credit_default["DefaultRate"].astype(float) * 100
 
-        # Order by our desired sequence
-        credit_default["order"] = credit_default["CREDIT_BIN"].map(
-            {b: i for i, b in enumerate(valid_bins)}
-        )
-        credit_default = credit_default.sort_values("order")
+    # Order by our desired sequence
+    order_map = {b: i for i, b in enumerate(valid_bins)}
+    credit_default["order"] = credit_default["CREDIT_BIN"].map(order_map)
+    credit_default = credit_default.sort_values("order")
 
-        fig_trend = px.line(
-            credit_default,
-            x="CREDIT_BIN",
-            y="DefaultRate",
-            markers=True,
-            title="Default Trend Across Financial Stress Buckets",
-            labels={
-                "CREDIT_BIN": "Credit / Income Stress Group",
-                "DefaultRate": "Default Rate (%)",
-            },
-            color_discrete_sequence=["#dc3545"],
-        )
-        fig_trend.update_traces(line_shape="linear", marker=dict(size=8))
-        fig_trend.update_yaxes(ticksuffix="%")
+    fig_trend = px.line(
+        credit_default,
+        x="CREDIT_BIN",
+        y="DefaultRate",
+        markers=True,
+        title="Default Trend Across Financial Stress Buckets",
+        labels={
+            "CREDIT_BIN": "Credit / Income Stress Group",
+            "DefaultRate": "Default Rate (%)",
+        },
+        color_discrete_sequence=["#dc3545"],
+    )
+    fig_trend.update_traces(line_shape="linear", marker=dict(size=8))
+    fig_trend.update_yaxes(ticksuffix="%")
 
-        col_line_l, col_line_r = st.columns([2, 1])
+    col_line_l, col_line_r = st.columns([2, 1])
 
-        with col_line_l:
-            st.plotly_chart(fig_trend, width="stretch")
+    with col_line_l:
+        st.plotly_chart(fig_trend, width="stretch")
+
+
 
         with col_line_r:
             st.markdown(
