@@ -62,12 +62,21 @@ st.markdown("""
 
 st.markdown("---")
 
-# === 2. DEMOGRAPHICS – SAME AS COLAB (USES app_data) ===
+# === 2. DEMOGRAPHICS – CLEAN LAYOUT, ASCENDING BARS ===
 st.header("👥 Demographic Segments – Who Is Riskier?")
 
+# 2 rows, 2 columns, with generous horizontal spacing
 fig_dem = make_subplots(
-    rows=2, cols=2,
-    subplot_titles=('Education level', 'Type of income', 'Family status', 'Housing type'),
+    rows=2,
+    cols=2,
+    horizontal_spacing=0.15,   # more space between left/right charts
+    vertical_spacing=0.20,     # more space between top/bottom charts
+    subplot_titles=(
+        'Education level',
+        'Type of income',
+        'Family status',
+        'Housing type'
+    ),
     specs=[[{"type": "bar"}, {"type": "bar"}],
            [{"type": "bar"}, {"type": "bar"}]]
 )
@@ -84,14 +93,12 @@ for i, col in enumerate(risk_columns):
         r, c = divmod(i, 2)
         r += 1; c += 1
 
-        # Colab logic: default rate by category, sorted DESC (riskiest first)
+        # Default rate by category (Colab data), then ASCENDING so labels are neat
         default_rate = (
             app_data.groupby(col)['TARGET']
                     .mean()
-                    .sort_values(ascending=False)
+                    .sort_values(ascending=True)   # safest → riskiest
         ).reset_index()
-
-        # After reset_index columns are [col, 'TARGET']
         default_rate.columns = [col, 'TARGET']
         default_rate['DefaultRate'] = (default_rate['TARGET'] * 100).round(2)
 
@@ -106,21 +113,32 @@ for i, col in enumerate(risk_columns):
                 'DefaultRate': 'Default rate (%)'
             }
         )
+
+        # Make x‑labels small and angled to reduce clutter
+        fig_tmp.update_layout(
+            xaxis=dict(tickangle=-35),
+            margin=dict(l=10, r=10, t=40, b=80)
+        )
+
         for trace in fig_tmp.data:
             fig_dem.add_trace(trace, row=r, col=c)
 
+# Global layout – a bit taller, more breathing room
 fig_dem.update_layout(
-    height=550,
+    height=650,
     showlegend=False,
-    title="Default Rate by Demographic Group (riskiest categories on the left)"
+    title="Default Rate by Demographic Group (safest on the left, riskiest on the right)",
+    margin=dict(l=40, r=40, t=80, b=40)
 )
+
 st.plotly_chart(fig_dem, width='stretch')
 
 st.markdown("""
 **Story:**
-- Each subplot orders categories from **highest** to **lowest** default rate, exactly as in the Colab EDA.
-- For income type, this makes **Maternity leave** appear above **Unemployed**, matching the notebook.
+- Within each demographic feature, categories move from **safest on the left** to **riskiest on the right**.
+- Extra spacing and angled labels make it easy to read each group without overlapping text.
 """)
+
 
 st.markdown("---")
 
