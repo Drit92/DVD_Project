@@ -114,47 +114,100 @@ with col2:
                           title="EXT_SOURCE_2 Distribution by Default", nbins=50)
     st.plotly_chart(fig_kde, width='stretch')
 
-# === 7. FIXED RADAR CHART ===
+# === 7. COLAB-EXACT RADAR CHART (Fixed Normalization) ===
 st.header("📈 Risk Profile Comparison")
-st.markdown("*Defaulters (red) vs Non-Defaulters (green) across 6 risk dimensions*")
+st.markdown("*Exact replica of Colab radar - Defaulters (🔴) vs Non-Defaulters (🟢)*")
 
-# FIXED: Safe column selection + integer indexing
 radar_cols = ['CREDIT_INCOME_RATIO', 'ANNUITY_INCOME_RATIO', 'FLAG_EVER_REFUSED', 
               'EXT_SOURCE_2', 'AGE_YEARS', 'INCOME_PER_PERSON']
 radar_cols = [c for c in radar_cols if c in df.columns]
 
-if len(radar_cols) > 0:
-    radar_data = df.groupby('TARGET')[radar_cols].mean()
-    radar_norm = radar_data.apply(lambda x: (x-x.min())/(x.max()-x.min()+1e-9), axis=1)
+if len(radar_cols) >= 3:
+    # === EXACT COLAB NORMALIZATION ===
+    # Step 1: Group means by TARGET (same as Colab)
+    radar_raw = df.groupby('TARGET')[radar_cols].mean()
     
+    # Step 2: COLAB-EXACT normalization (per-feature across both groups)
+    radar_norm = pd.DataFrame(index=radar_cols)
+    
+    for col in radar_cols:
+        col_min = radar_raw[col].min()
+        col_max = radar_raw[col].max()
+        radar_norm.loc[col, 0] = (radar_raw.loc[0, col] - col_min) / (col_max - col_min + 1e-9)
+        radar_norm.loc[col, 1] = (radar_raw.loc[1, col] - col_min) / (col_max - col_min + 1e-9)
+    
+    radar_norm = radar_norm.astype(float)
+    
+    # Debug: Show normalized values (REMOVE after testing)
+    st.caption("🔍 Normalized values (0=low risk, 1=high risk per feature):")
+    st.dataframe(radar_norm.round(3))
+    
+    # === CREATE RADAR ===
     fig_radar = go.Figure()
     
-    # FIXED: Use column names instead of integer indexing
-    for target_name, target_val in [('Non-Defaulters', 0), ('Defaulters', 1)]:
-        if target_val in radar_norm.columns:
-            values = radar_norm[target_val].tolist()
-            values += values[:1]  # Close the polygon
-            angles = np.linspace(0, 2*np.pi, len(radar_norm)+1)
-            
-            fig_radar.add_trace(go.Scatterpolar(
-                r=values,
-                theta=radar_norm.index.tolist() + [radar_norm.index[0]],
-                fill='toself',
-                name=target_name,
-                line_color='green' if target_val == 0 else 'red',
-                line=dict(width=3),
-                opacity=0.7
-            ))
+    # Non-Defaulters (Green - Target=0)
+    values0 = radar_norm[0].tolist() + radar_norm[0].tolist()[:1]
+    angles0 = np.linspace(0, 2*np.pi, len(radar_norm)+1).tolist()
+    
+    fig_radar.add_trace(go.Scatterpolar(
+        r=values0,
+        theta=radar_cols + [radar_cols[0]],
+        fill='toself',
+        name='🟢 Non-Defaulters',
+        line_color='green',
+        line=dict(width=4),
+        fillcolor='rgba(0,255,0,0.2)',
+        showlegend=True
+    ))
+    
+    # Defaulters (Red - Target=1)  
+    values1 = radar_norm[1].tolist() + radar_norm[1].tolist()[:1]
+    
+    fig_radar.add_trace(go.Scatterpolar(
+        r=values1,
+        theta=radar_cols + [radar_cols[0]],
+        fill='toself', 
+        name='🔴 Defaulters',
+        line_color='red',
+        line=dict(width=4),
+        fillcolor='rgba(255,0,0,0.2)',
+        showlegend=True
+    ))
     
     fig_radar.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
+        polar=dict(
+            radialaxis=dict(
+                visible=True, 
+                range=[0, 1],
+                tickvals=[0, 0.2, 0.4, 0.6, 0.8, 1.0],
+                tickformat='.1f'
+            )
+        ),
         showlegend=True,
-        title="Risk Profile: Defaulters vs Non-Defaulters",
-        height=500
+        title="Risk Profile: Defaulters vs Non-Defaulters (Normalized)",
+        height=650,
+        legend=dict(
+            yanchor="top", 
+            y=0.99, 
+            xanchor="left", 
+            x=1.05,
+            bgcolor="rgba(255,255,255,0.9)"
+        ),
+        margin=dict(t=80)
     )
+    
     st.plotly_chart(fig_radar, width='stretch')
+    
+    st.markdown("""
+    **📋 Key Insights (Exact Colab Logic):**
+    - **🟢 Non-Defaulters**: Lower ratios, older age, higher income, strong EXT scores
+    - **🔴 Defaulters**: High credit/EMI burden, younger, weak external scores  
+    - Each spoke normalized **separately** (0=best in group, 1=worst in group)
+    """)
+    
 else:
-    st.warning("Radar columns not available")
+    st.error(f"❌ Missing radar columns. Available: {radar_cols}")
+
 
 # === 8. INTERACTION HEATMAP ===
 st.header("🔥 Risk Interactions")
