@@ -398,40 +398,50 @@ credit_default = get_agg("credit_default").copy()
 if credit_default.empty:
     st.info("Credit / income default aggregate not available.")
 else:
+    # Inspect once if needed
+    # st.write(credit_default)
+
+    # Clean: drop NaN bins and keep only known labels
+    valid_bins = ["0-1x", "1-2x", "2-3x", "3-5x", "5x+"]
     credit_default = credit_default.dropna(subset=["CREDIT_BIN"])
-    credit_default["DefaultRate"] = credit_default["DefaultRate"] * 100
+    credit_default = credit_default[credit_default["CREDIT_BIN"].isin(valid_bins)]
 
-    credit_order = ["0-1x", "1-2x", "2-3x", "3-5x", "5x+"]
-    credit_default["CREDIT_BIN"] = pd.Categorical(
-        credit_default["CREDIT_BIN"],
-        categories=credit_order,
-        ordered=True,
-    )
-    credit_default = credit_default.sort_values("CREDIT_BIN")
+    # If after cleaning there are fewer than 2 points, show a message
+    if len(credit_default) < 2:
+        st.info("Not enough non‑empty credit bins to draw a trend line.")
+    else:
+        # Ensure numeric y
+        credit_default["DefaultRate"] = credit_default["DefaultRate"].astype(float) * 100
 
-    fig_trend = px.line(
-        credit_default,
-        x="CREDIT_BIN",
-        y="DefaultRate",
-        markers=True,
-        title="Default Trend Across Financial Stress Buckets",
-        labels={
-            "CREDIT_BIN": "Credit / Income Stress Group",
-            "DefaultRate": "Default Rate (%)",
-        },
-        color_discrete_sequence=["#dc3545"],
-    )
-    fig_trend.update_traces(line_shape="linear", marker=dict(size=8))
-    fig_trend.update_yaxes(ticksuffix="%")
+        # Order by our desired sequence
+        credit_default["order"] = credit_default["CREDIT_BIN"].map(
+            {b: i for i, b in enumerate(valid_bins)}
+        )
+        credit_default = credit_default.sort_values("order")
 
-    col_line_l, col_line_r = st.columns([2, 1])
+        fig_trend = px.line(
+            credit_default,
+            x="CREDIT_BIN",
+            y="DefaultRate",
+            markers=True,
+            title="Default Trend Across Financial Stress Buckets",
+            labels={
+                "CREDIT_BIN": "Credit / Income Stress Group",
+                "DefaultRate": "Default Rate (%)",
+            },
+            color_discrete_sequence=["#dc3545"],
+        )
+        fig_trend.update_traces(line_shape="linear", marker=dict(size=8))
+        fig_trend.update_yaxes(ticksuffix="%")
 
-    with col_line_l:
-        st.plotly_chart(fig_trend, width="stretch")
+        col_line_l, col_line_r = st.columns([2, 1])
 
-    with col_line_r:
-        st.markdown(
-            """
+        with col_line_l:
+            st.plotly_chart(fig_trend, width="stretch")
+
+        with col_line_r:
+            st.markdown(
+                """
 **Line‑chart insights:**
 
 - Default rate **rises steadily** as the loan amount grows relative to income, 
@@ -439,7 +449,8 @@ else:
 - Keeping credit exposure below about **4× annual income** keeps default risk in a
   more stable band; above that, the curve bends upward sharply.
 """
-        )
+            )
+
 
 st.markdown("---")
 
