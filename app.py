@@ -697,7 +697,6 @@ else:
     radar_means["TARGET"] = radar_means["TARGET"].astype(int)
     radar_means = radar_means.set_index("TARGET").T  # rows=features, cols=TARGET
 
-    # Min–max normalise each feature
     radar_norm = radar_means.apply(
         lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9),
         axis=1,
@@ -707,7 +706,6 @@ else:
     angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
     angles += angles[:1]
 
-    # 4×4 in figure, bounded by larger padding
     fig_radar, ax_radar = plt.subplots(
         figsize=(4, 4),
         subplot_kw=dict(polar=True),
@@ -716,26 +714,25 @@ else:
 
     if 0 in radar_norm.columns:
         vals0 = radar_norm[0].tolist() + radar_norm[0].tolist()[:1]
-        ax_radar.plot(angles, vals0, linewidth=1.4, label="Non-Defaulters (0)", color="green")
-        ax_radar.fill(angles, vals0, alpha=0.25, color="green")
+        ax_radar.plot(angles, vals0, linewidth=1.3, label="Non-Defaulters (0)", color="green")
+        ax_radar.fill(angles, vals0, alpha=0.22, color="green")
 
     if 1 in radar_norm.columns:
         vals1 = radar_norm[1].tolist() + radar_norm[1].tolist()[:1]
-        ax_radar.plot(angles, vals1, linewidth=1.4, label="Defaulters (1)", color="red")
-        ax_radar.fill(angles, vals1, alpha=0.25, color="red")
+        ax_radar.plot(angles, vals1, linewidth=1.3, label="Defaulters (1)", color="red")
+        ax_radar.fill(angles, vals1, alpha=0.22, color="red")
 
     ax_radar.set_xticks(angles[:-1])
-    ax_radar.set_xticklabels(labels, fontsize=8)
+    ax_radar.set_xticklabels(labels, fontsize=7)  # slightly smaller
     ax_radar.set_ylim(0, 1)
     ax_radar.set_yticklabels([])
 
-    # Add clear margin band around the radar inside the figure
-    fig_radar.subplots_adjust(left=0.22, right=0.78, top=0.78, bottom=0.22)
+    # more padding so labels sit further from the circle and from each other
+    fig_radar.subplots_adjust(left=0.25, right=0.75, top=0.78, bottom=0.25)
 
-    ax_radar.set_title("Risk Profile Comparison – Radar Chart", pad=10, fontsize=11)
-    ax_radar.legend(bbox_to_anchor=(1.25, 1.0), borderaxespad=0.0, fontsize=8)
+    ax_radar.set_title("Risk Profile Comparison – Radar Chart", pad=12, fontsize=11)
+    ax_radar.legend(bbox_to_anchor=(1.22, 1.0), borderaxespad=0.0, fontsize=7)
 
-    # Let Streamlit manage width; this will scale with zoom like other charts
     st.pyplot(fig_radar, use_container_width=False)
 
     st.markdown(
@@ -743,3 +740,4 @@ else:
 **Insight:** The red shape (defaulters) bulges where debt burdens and refusals are higher and external scores weaker, while the green shape (non‑defaulters) shows lower leverage and stronger scores.
 """
     )
+
