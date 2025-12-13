@@ -744,3 +744,4 @@ else:
     st.markdown(
         """
 **Insight:** The red shape (defaulters) bulges where debt burdens and refusals are higher and external scores
+)
