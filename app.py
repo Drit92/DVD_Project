@@ -75,9 +75,11 @@ df_def = aggs["df_def"]
 # ----------------------------------------------------
 @st.cache_data
 def build_loan_kind(series_contract_type: pd.Series) -> pd.Series:
+    # Adjust these keys to the exact values in NAME_CONTRACT_TYPE
     type_map = {
         "Cash loans": "Personal loan",
-        "Revolving loans": "Revolving / card",
+        "Industrial loans": "Industrial loan",   # <- your industrial flag
+        # remove "Revolving loans" if you don't want that category
     }
     return series_contract_type.map(type_map).fillna(series_contract_type)
 
