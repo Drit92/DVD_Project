@@ -241,30 +241,36 @@ else:
     tmp['EXT2_Q_NUM'] = tmp['EXT2_Q'].map(label_to_num)
     bubble_src = tmp.dropna(subset=['EXT2_Q_NUM'])
 
-bubble_group = bubble_src.groupby(['EXT2_Q_NUM', 'FLAG_EVER_REFUSED'])['TARGET'].mean() * 100
-bubble_count = bubble_src.groupby(['EXT2_Q_NUM', 'FLAG_EVER_REFUSED'])['TARGET'].count()
+# 👉 make colour column categorical strings
+bubble_src['REFUSAL_STR'] = bubble_src['FLAG_EVER_REFUSED'].map({0: 'No refusal', 1: 'Had refusal'})
+
+bubble_group = bubble_src.groupby(['EXT2_Q_NUM', 'REFUSAL_STR'])['TARGET'].mean() * 100
+bubble_count = bubble_src.groupby(['EXT2_Q_NUM', 'REFUSAL_STR'])['TARGET'].count()
 
 bubble_final = pd.DataFrame({
     'DefaultRate': bubble_group,
     'Count': bubble_count
 }).reset_index()
 
-# Jitter so red/green don’t overlap
-offset_map = {0: -0.12, 1: 0.12}
-bubble_final['x_pos'] = bubble_final['EXT2_Q_NUM'] + bubble_final['FLAG_EVER_REFUSED'].map(offset_map)
+# Jitter so points do not overlap
+offset_map = {'No refusal': -0.12, 'Had refusal': 0.12}
+bubble_final['x_pos'] = bubble_final['EXT2_Q_NUM'] + bubble_final['REFUSAL_STR'].map(offset_map)
 
 fig_bubble = px.scatter(
     bubble_final,
     x='x_pos',
     y='DefaultRate',
     size='Count',
-    color='FLAG_EVER_REFUSED',
+    color='REFUSAL_STR',                              # use string column
     size_max=40,
-    color_discrete_map={0: 'green', 1: 'red'},   # <<< force green / red
+    color_discrete_map={
+        'No refusal': 'green',
+        'Had refusal': 'red'
+    },
     labels={
         'x_pos': 'External score quartile (higher = safer)',
         'DefaultRate': 'Default rate (%)',
-        'FLAG_EVER_REFUSED': 'Previous refusal (0 = No, 1 = Yes)'
+        'REFUSAL_STR': 'Previous refusal'
     },
     title="External Score vs Past Refusal (Bubble Size = Number of Customers)"
 )
@@ -278,6 +284,7 @@ fig_bubble.update_xaxes(
 fig_bubble.update_yaxes(ticksuffix="%")
 
 st.plotly_chart(fig_bubble, width="stretch")
+
 
 
 st.markdown("""
