@@ -222,7 +222,7 @@ st.header("📅 Age Profile of Defaulters")
 df_def = df[df['TARGET'] == 1].copy()
 df_def['AGE_YEARS'] = df_def['AGE_YEARS'].clip(lower=18, upper=80)
 
-fig_age, ax_age = plt.subplots(figsize=(5, 3))
+fig_age, ax_age = plt.subplots(figsize=(4, 2.5))
 
 sns.histplot(
     data=df_def,
@@ -545,7 +545,7 @@ if len(radar_cols) >= 3:
     angles += angles[:1]
 
     fig_radar, ax_radar = plt.subplots(
-        figsize=(5, 5),
+        figsize=(3.8, 3.8),
         subplot_kw=dict(polar=True)
     )
 
@@ -560,7 +560,7 @@ if len(radar_cols) >= 3:
         ax_radar.fill(angles, vals1, alpha=0.25, color='red')
 
     ax_radar.set_xticks(angles[:-1])
-    ax_radar.set_xticklabels(labels, fontsize=9)
+    ax_radar.set_xticklabels(labels, fontsize=6)
     ax_radar.set_ylim(0, 1)
     ax_radar.set_yticklabels([])
 
