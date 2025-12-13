@@ -114,7 +114,7 @@ with col1:
 
 with col2:
     c1, c2, c3 = st.columns(3)
-    c1.metric("Total Applicants", f"{total_applicants:,}")
+    c1.metric("Total Applicantions", f"{total_applicants:,}")
     c2.metric(
         "Total Defaulters",
         f"{total_defaulters:,}",
