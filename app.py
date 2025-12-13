@@ -1,5 +1,6 @@
 import io
 import zipfile
+import os
 
 import numpy as np
 import pandas as pd
@@ -24,14 +25,19 @@ st.markdown("---")
 
 
 # ============================================
-# LOAD AGGREGATES FROM ZIP
+# LOAD AGGREGATES FROM ZIP IN REPO ROOT
 # ============================================
 
+ZIP_PATH = "loan_risk_aggregates.zip"  # file placed in repo root alongside app.py
+
 @st.cache_data(show_spinner="🔄 Loading pre-aggregated loan risk data...")
-def load_aggregates(zip_bytes: bytes) -> dict:
-    """Load all agg_*.csv from uploaded ZIP into a dict of DataFrames."""
+def load_aggregates_from_disk(zip_path: str) -> dict:
+    if not os.path.exists(zip_path):
+        st.error(f"ZIP file '{zip_path}' not found in app root. Upload it to the repo.")
+        st.stop()
+
     agg_dict = {}
-    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+    with zipfile.ZipFile(zip_path, "r") as zf:
         for name in zf.namelist():
             if name.startswith("agg_") and name.endswith(".csv"):
                 with zf.open(name) as f:
@@ -39,18 +45,7 @@ def load_aggregates(zip_bytes: bytes) -> dict:
                 agg_dict[name] = df
     return agg_dict
 
-
-uploaded = st.file_uploader(
-    "Upload **loan_risk_aggregates.zip** generated from Colab",
-    type=["zip"],
-)
-
-if uploaded is None:
-    st.info("⬆️ Upload the ZIP file to load the dashboard.")
-    st.stop()
-
-aggs = load_aggregates(uploaded.read())
-
+aggs = load_aggregates_from_disk(ZIP_PATH)
 
 def get_agg(name: str, required: bool = True) -> pd.DataFrame:
     """Helper: fetch agg_<name>.csv or stop if required and missing."""
@@ -61,6 +56,7 @@ def get_agg(name: str, required: bool = True) -> pd.DataFrame:
             st.stop()
         return pd.DataFrame()
     return aggs[fname]
+
 
 
 # ============================================
