@@ -483,7 +483,21 @@ st.plotly_chart(fig_hist, width='stretch')
 st.markdown("---")
 
 # === 7. COMBINED RISK SCORE ===
-st.header("🎯 Combined Risk Score – One Number to Rank Risk")
+st.header("🎯 Combined Risk Score – One Number That Combines All Risk Flags")
+
+st.markdown("""
+This score is built by **adding three pieces of information** for each applicant:
+
+- **Financial stress score** – how heavy their loan is vs income (credit / income, EMI / income).  
+- **Behavioural score** – past refusals and credit‑shopping behaviour (number of previous applications).  
+- **External score bucket** – how good their bureau / external risk score is.
+
+In simple terms:
+
+> **Combined Risk Score = Financial Stress Score + Behavioural Score + External Score Component**
+
+Higher values mean **more red flags** across these three areas.
+""")
 
 risk_def = df.groupby('RISK_SCORE')['TARGET'].mean() * 100
 risk_def = risk_def.sort_index()
@@ -492,17 +506,12 @@ fig_risk = px.bar(
     x=risk_def.index.astype(str),
     y=risk_def.values,
     title="Default Rate by Combined Risk Score",
-    labels={'x': 'Risk score (0 = safest, higher = riskier)', 'y': 'Default rate (%)'},
+    labels={'x': 'Combined risk score (0 = safest, higher = riskier)', 'y': 'Default rate (%)'},
     color_discrete_sequence=['#fd7e14']
 )
-fig_risk.update_yaxes(tickformat=".0%")
+fig_risk.update_yaxes(ticksuffix="%", title='Default rate (%)')
 st.plotly_chart(fig_risk, width='stretch')
 
-st.markdown("""
-**Story:**
-- Low scores group the **safest** customers; high scores gather the **riskiest**.
-- This single score can drive **approval thresholds, pricing tiers, or watchlists**.
-""")
 
 st.markdown("---")
 
