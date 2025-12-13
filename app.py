@@ -1,6 +1,6 @@
+import os
 import io
 import zipfile
-import os
 
 import numpy as np
 import pandas as pd
@@ -28,12 +28,13 @@ st.markdown("---")
 # LOAD AGGREGATES FROM ZIP IN REPO ROOT
 # ============================================
 
-ZIP_PATH = "loan_risk_aggregates.zip"  # file placed in repo root alongside app.py
+ZIP_PATH = "loan_risk_aggregates.zip"  # must sit next to app.py
+
 
 @st.cache_data(show_spinner="🔄 Loading pre-aggregated loan risk data...")
 def load_aggregates_from_disk(zip_path: str) -> dict:
     if not os.path.exists(zip_path):
-        st.error(f"ZIP file '{zip_path}' not found in app root. Upload it to the repo.")
+        st.error(f"ZIP file '{zip_path}' not found in app root. Commit it to the repo.")
         st.stop()
 
     agg_dict = {}
@@ -45,7 +46,9 @@ def load_aggregates_from_disk(zip_path: str) -> dict:
                 agg_dict[name] = df
     return agg_dict
 
+
 aggs = load_aggregates_from_disk(ZIP_PATH)
+
 
 def get_agg(name: str, required: bool = True) -> pd.DataFrame:
     """Helper: fetch agg_<name>.csv or stop if required and missing."""
@@ -56,7 +59,6 @@ def get_agg(name: str, required: bool = True) -> pd.DataFrame:
             st.stop()
         return pd.DataFrame()
     return aggs[fname]
-
 
 
 # ============================================
@@ -395,39 +397,37 @@ if credit_default.empty:
     st.info("Credit / income default aggregate not available.")
 else:
     # Remove NaN bin and keep bins in the expected order
-    valid_bins = ["0–1x", "1–2x", "2–3x", "3–5x", "5x+"]  # or "0-1x" etc. to match your labels
+    valid_bins = ["0–1x", "1–2x", "2–3x", "3–5x", "5x+"]  # match labels from Colab
     credit_default = credit_default.dropna(subset=["CREDIT_BIN"])
     credit_default = credit_default[credit_default["CREDIT_BIN"].isin(valid_bins)]
 
-    # Convert to percentage
-    credit_default["DefaultRate"] = credit_default["DefaultRate"].astype(float) * 100
+    if len(credit_default) < 2:
+        st.info("Not enough non-empty credit bins to draw a trend line.")
+    else:
+        credit_default["DefaultRate"] = credit_default["DefaultRate"].astype(float) * 100
+        order_map = {b: i for i, b in enumerate(valid_bins)}
+        credit_default["order"] = credit_default["CREDIT_BIN"].map(order_map)
+        credit_default = credit_default.sort_values("order")
 
-    # Order by our desired sequence
-    order_map = {b: i for i, b in enumerate(valid_bins)}
-    credit_default["order"] = credit_default["CREDIT_BIN"].map(order_map)
-    credit_default = credit_default.sort_values("order")
+        fig_trend = px.line(
+            credit_default,
+            x="CREDIT_BIN",
+            y="DefaultRate",
+            markers=True,
+            title="Default Trend Across Financial Stress Buckets",
+            labels={
+                "CREDIT_BIN": "Credit / Income Stress Group",
+                "DefaultRate": "Default Rate (%)",
+            },
+            color_discrete_sequence=["#dc3545"],
+        )
+        fig_trend.update_traces(line_shape="linear", marker=dict(size=8))
+        fig_trend.update_yaxes(ticksuffix="%")
 
-    fig_trend = px.line(
-        credit_default,
-        x="CREDIT_BIN",
-        y="DefaultRate",
-        markers=True,
-        title="Default Trend Across Financial Stress Buckets",
-        labels={
-            "CREDIT_BIN": "Credit / Income Stress Group",
-            "DefaultRate": "Default Rate (%)",
-        },
-        color_discrete_sequence=["#dc3545"],
-    )
-    fig_trend.update_traces(line_shape="linear", marker=dict(size=8))
-    fig_trend.update_yaxes(ticksuffix="%")
+        col_line_l, col_line_r = st.columns([2, 1])
 
-    col_line_l, col_line_r = st.columns([2, 1])
-
-    with col_line_l:
-        st.plotly_chart(fig_trend, width="stretch")
-
-
+        with col_line_l:
+            st.plotly_chart(fig_trend, width="stretch")
 
         with col_line_r:
             st.markdown(
@@ -440,7 +440,6 @@ else:
   more stable band; above that, the curve bends upward sharply.
 """
             )
-
 
 st.markdown("---")
 
