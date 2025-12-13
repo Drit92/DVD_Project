@@ -212,15 +212,16 @@ st.header("👥 Demographic Segments – Who Is Riskier?")
 fig_dem = make_subplots(
     rows=2,
     cols=2,
-    horizontal_spacing=0.12,
-    vertical_spacing=0.18,
+    horizontal_spacing=0.12,   # more gap horizontally
+    vertical_spacing=0.25,     # more gap vertically (was 0.18)
     subplot_titles=(
         "Education level",
         "Type of income",
         "Family status",
         "Housing type",
     ),
-    specs=[[{"type": "bar"}, {"type": "bar"}], [{"type": "bar"}, {"type": "bar"}]],
+    specs=[[{"type": "bar"}, {"type": "bar"}],
+           [{"type": "bar"}, {"type": "bar"}]],
 )
 
 demo_mapping = {
@@ -237,7 +238,7 @@ for col, (r, c) in demo_mapping.items():
 
     df_demo = df_demo.copy()
     df_demo["DefaultRate"] = (df_demo["DefaultRate"] * 100).round(2)
-    df_demo = df_demo.sort_values("DefaultRate", ascending=False)  # riskiest left
+    df_demo = df_demo.sort_values("DefaultRate", ascending=False)
 
     fig_tmp = px.bar(
         df_demo,
@@ -250,18 +251,24 @@ for col, (r, c) in demo_mapping.items():
             "DefaultRate": "Default rate (%)",
         },
     )
-    fig_tmp.update_layout(xaxis=dict(tickangle=-35), coloraxis_showscale=False)
+    # tighten inner plot margins so subplots don't bleed into each other
+    fig_tmp.update_layout(
+        margin=dict(t=40, b=40, l=40, r=40),
+        xaxis=dict(tickangle=-35),
+        coloraxis_showscale=False,
+    )
 
     for trace in fig_tmp.data:
         fig_dem.add_trace(trace, row=r, col=c)
 
 fig_dem.update_layout(
-    height=550,
+    height=650,                              # a bit taller
     showlegend=False,
     title="Default Rate by Demographic Group (riskiest categories on the left)",
-    margin=dict(l=30, r=30, t=70, b=40),
+    margin=dict(l=50, r=50, t=80, b=50),     # outer margins
     transition_duration=0,
 )
+
 st.plotly_chart(fig_dem, width="stretch")
 
 st.markdown(
