@@ -229,10 +229,10 @@ st.markdown("""
 """)
 st.markdown("---")
 
-# === 4. BUBBLE CHART – EXTERNAL SCORE vs REFUSAL (NON‑OVERLAPPING) ===
+# === 4. BUBBLE CHART – EXTERNAL SCORE vs REFUSAL (NON‑OVERLAPPING, RED/GREEN) ===
 st.header("🎯 External Score + Past Refusal – Combined Risk")
 
-# Assume EXT2_Q_NUM (1–4) exists; otherwise map from labels as before
+# Prepare source
 if 'EXT2_Q_NUM' in df.columns:
     bubble_src = df[['EXT2_Q', 'EXT2_Q_NUM', 'FLAG_EVER_REFUSED', 'TARGET']].dropna()
 else:
@@ -249,7 +249,7 @@ bubble_final = pd.DataFrame({
     'Count': bubble_count
 }).reset_index()
 
-# Jitter x‑position slightly to avoid overlap
+# Jitter so red/green don’t overlap
 offset_map = {0: -0.12, 1: 0.12}
 bubble_final['x_pos'] = bubble_final['EXT2_Q_NUM'] + bubble_final['FLAG_EVER_REFUSED'].map(offset_map)
 
@@ -260,7 +260,7 @@ fig_bubble = px.scatter(
     size='Count',
     color='FLAG_EVER_REFUSED',
     size_max=40,
-    color_discrete_map={0: 'green', 1: 'red'},  # 0 = clean (green), 1 = refused (red)
+    color_discrete_map={0: 'green', 1: 'red'},   # <<< force green / red
     labels={
         'x_pos': 'External score quartile (higher = safer)',
         'DefaultRate': 'Default rate (%)',
@@ -276,7 +276,9 @@ fig_bubble.update_xaxes(
     ticktext=[f"Q{q}" for q in quartile_ticks]
 )
 fig_bubble.update_yaxes(ticksuffix="%")
-st.plotly_chart(fig_bubble, width='stretch')
+
+st.plotly_chart(fig_bubble, width="stretch")
+
 
 st.markdown("""
 **Insights:**
