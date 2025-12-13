@@ -61,53 +61,52 @@ st.markdown("""
 
 st.markdown("---")
 
-# === 2. DEMOGRAPHICS – SORTED ASC ===
+# === 2. DEMOGRAPHICS – MATCH COLAB (SEABORN 2x2 GRID) ===
 st.header("👥 Demographic Segments – Who Is Riskier?")
 
-fig_dem = make_subplots(
-    rows=2, cols=2,
-    subplot_titles=('Education level', 'Type of income', 'Family status', 'Housing type'),
-    specs=[[{"type": "bar"}, {"type": "bar"}],
-           [{"type": "bar"}, {"type": "bar"}]]
-)
-
-cat_cols = [
+risk_columns = [
     'NAME_EDUCATION_TYPE',
     'NAME_INCOME_TYPE',
     'NAME_FAMILY_STATUS',
     'NAME_HOUSING_TYPE'
 ]
 
-for i, col in enumerate(cat_cols):
-    if col in df.columns:
-        r, c = divmod(i, 2)
-        r += 1; c += 1
-        tmp = df.groupby(col)['TARGET'].mean().reset_index()
-        tmp['DefaultRate'] = (tmp['TARGET'] * 100).round(2)
-        tmp = tmp.sort_values('DefaultRate', ascending=True)
+# Create the same 2x2 layout as Colab
+fig_dem, axes = plt.subplots(2, 2, figsize=(10, 6))  # smaller than Colab 18x12
+axes = axes.flatten()
 
-        fig_tmp = px.bar(
-            tmp,
-            x=col,
-            y='DefaultRate',
-            color='DefaultRate',
-            color_continuous_scale='Reds',
-            labels={col: col.replace('_', ' ').title(), 'DefaultRate': 'Default rate (%)'}
-        )
-        for trace in fig_tmp.data:
-            fig_dem.add_trace(trace, row=r, col=c)
+for i, col in enumerate(risk_columns):
+    ax_i = axes[i]
 
-fig_dem.update_layout(
-    height=550,
-    showlegend=False,
-    title="Default Rate by Demographic Group (sorted from safest to riskiest)"
-)
-st.plotly_chart(fig_dem, width='stretch')
+    default_rate = (
+        df.groupby(col)['TARGET']
+        .mean()
+        .sort_values(ascending=False)
+    )
+
+    sns.barplot(
+        x=default_rate.index,
+        y=default_rate.values,
+        palette="viridis",
+        ax=ax_i
+    )
+    ax_i.set_xticklabels(ax_i.get_xticklabels(), rotation=45, ha='right', fontsize=8)
+    ax_i.set_title(f"Default Rate by {col}", fontsize=10)
+    ax_i.set_ylabel("Average TARGET (Default %)")
+    ax_i.set_xlabel(col.replace('_', ' ').title())
+    ax_i.grid(True, axis='y', linestyle='--', alpha=0.3)
+
+# Hide any unused subplot (defensive, in case of fewer cols)
+for j in range(len(risk_columns), len(axes)):
+    fig_dem.delaxes(axes[j])
+
+plt.tight_layout(pad=1.0)
+st.pyplot(fig_dem, width="content")   # behaves like other charts on zoom
 
 st.markdown("""
 **Story:**
-- Higher education, government income, being married, and owning a home are all linked to **safer borrowers**.
-- Lower education, unstable income and renting or living with parents increase default risk.
+- Bars are ordered from **highest** to **lowest** default rate for each demographic group.
+- Segments on the left of each plot are the **riskiest** categories within that feature.
 """)
 
 st.markdown("---")
