@@ -11,7 +11,7 @@ import streamlit as st
 
 
 # ============================================
-# CONFIG
+# STREAMLIT CONFIG
 # ============================================
 
 st.set_page_config(
@@ -24,12 +24,12 @@ st.markdown("---")
 
 
 # ============================================
-# DATA LOADING – FROM AGG ZIP ONLY
+# LOAD AGGREGATES FROM ZIP
 # ============================================
 
 @st.cache_data(show_spinner="🔄 Loading pre-aggregated loan risk data...")
-def load_aggregates(zip_bytes: bytes):
-    """Load all agg_*.csv from the provided ZIP into a dict of DataFrames."""
+def load_aggregates(zip_bytes: bytes) -> dict:
+    """Load all agg_*.csv from uploaded ZIP into a dict of DataFrames."""
     agg_dict = {}
     with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
         for name in zf.namelist():
@@ -41,25 +41,25 @@ def load_aggregates(zip_bytes: bytes):
 
 
 uploaded = st.file_uploader(
-    "Upload loan_risk_aggregates.zip (from Colab)",
+    "Upload **loan_risk_aggregates.zip** generated from Colab",
     type=["zip"],
 )
 
 if uploaded is None:
-    st.info("⬆️ Please upload **loan_risk_aggregates.zip** to view the dashboard.")
+    st.info("⬆️ Upload the ZIP file to load the dashboard.")
     st.stop()
 
 aggs = load_aggregates(uploaded.read())
 
-# Helper: comfortable access by logical name
+
 def get_agg(name: str, required: bool = True) -> pd.DataFrame:
+    """Helper: fetch agg_<name>.csv or stop if required and missing."""
     fname = f"agg_{name}.csv"
     if fname not in aggs:
         if required:
-            st.error(f"Missing {fname} in the ZIP. Regenerate aggregates.")
+            st.error(f"Missing {fname} in ZIP. Regenerate aggregates in Colab.")
             st.stop()
-        else:
-            return pd.DataFrame()
+        return pd.DataFrame()
     return aggs[fname]
 
 
@@ -75,9 +75,7 @@ total_defaulters = int(overview_map.get("total_defaulters", 0))
 total_good = int(overview_map.get("total_good_borrowers", 0))
 default_rate_overall = float(overview_map.get("default_rate_overall", 0.0))
 
-# For TARGET donut
 target_dist = get_agg("target_distribution").copy()
-# target_dist: columns ["TARGET","Share"]
 target_dist["TARGET"] = target_dist["TARGET"].astype(int)
 
 
@@ -90,7 +88,6 @@ st.header("📈 Portfolio Overview – Who Defaults?")
 col1, col2 = st.columns([1, 2])
 
 with col1:
-    # Donut: share of good vs defaulters
     labels = ["Good borrower (0)", "Defaulter (1)"]
     shares = [
         float(target_dist.loc[target_dist["TARGET"] == 0, "Share"].values[0]),
@@ -115,7 +112,7 @@ with col1:
         margin=dict(t=80, b=10, l=10, r=10),
         transition_duration=0,
     )
-    st.plotly_chart(fig_donut, use_container_width=True)
+    st.plotly_chart(fig_donut, width="stretch")
 
 with col2:
     c1, c2, c3 = st.columns(3)
@@ -143,12 +140,12 @@ st.header("🧍 Borrower Profiles – Who Applies?")
 
 col1, col2 = st.columns(2)
 
-# Gender mix
 with col1:
     st.subheader("Applicant Gender Mix")
     gender_mix = get_agg("gender_mix", required=False)
-    if not gender_mix.empty:
-        # gender_mix: CODE_GENDER, Share
+    if gender_mix.empty:
+        st.info("Gender mix aggregate not available.")
+    else:
         label_map = {"M": "Male", "F": "Female"}
         gender_mix["Label"] = gender_mix["CODE_GENDER"].map(label_map).fillna(
             gender_mix["CODE_GENDER"]
@@ -173,17 +170,15 @@ with col1:
             height=260,
             transition_duration=0,
         )
-        st.plotly_chart(fig_gender_pie, use_container_width=True)
-    else:
-        st.info("Gender mix aggregate not available.")
+        st.plotly_chart(fig_gender_pie, width="stretch")
 
-# Age distribution (overall) – approximate from defaulter histogram bins
 with col2:
-    st.subheader("Applicant Age Distribution")
+    st.subheader("Applicant Age Distribution (Defaulters Approx.)")
     age_hist = get_agg("age_defaulters_hist", required=False)
-    if not age_hist.empty:
-        # Use bin midpoints as x, counts as y. This is defaulters-only,
-        # but still gives a shape. For exact overall histogram you’d need a separate agg.
+    if age_hist.empty:
+        st.info("Age histogram aggregate not available.")
+    else:
+        age_hist = age_hist.copy()
         age_hist["bin_mid"] = (age_hist["bin_left"] + age_hist["bin_right"]) / 2
         fig_age_all = px.bar(
             age_hist,
@@ -198,9 +193,7 @@ with col2:
         )
         fig_age_all.update_traces(marker_line_width=1.2, marker_line_color="black")
         fig_age_all.update_layout(height=260, transition_duration=0)
-        st.plotly_chart(fig_age_all, use_container_width=True)
-    else:
-        st.info("Age histogram aggregate not available.")
+        st.plotly_chart(fig_age_all, width="stretch")
 
 st.markdown(
     """
@@ -213,7 +206,7 @@ st.markdown("---")
 
 
 # ============================================
-# 2. DEMOGRAPHIC SEGMENTS – DEFAULT RATES
+# 2. DEMOGRAPHIC SEGMENTS – RISKIEST LEFT
 # ============================================
 
 st.header("👥 Demographic Segments – Who Is Riskier?")
@@ -241,35 +234,38 @@ demo_mapping = {
 
 for col, (r, c) in demo_mapping.items():
     df_demo = get_agg(f"demo_{col}", required=False)
-    if not df_demo.empty:
-        df_demo = df_demo.copy()
-        df_demo["DefaultRate"] = (df_demo["DefaultRate"] * 100).round(2)
-        df_demo = df_demo.sort_values("DefaultRate", ascending=True)
+    if df_demo.empty:
+        continue
 
-        fig_tmp = px.bar(
-            df_demo,
-            x=col,
-            y="DefaultRate",
-            color="DefaultRate",
-            color_continuous_scale="Reds",
-            labels={
-                col: col.replace("_", " ").title(),
-                "DefaultRate": "Default rate (%)",
-            },
-        )
-        fig_tmp.update_layout(xaxis=dict(tickangle=-35), coloraxis_showscale=False)
+    df_demo = df_demo.copy()
+    df_demo["DefaultRate"] = (df_demo["DefaultRate"] * 100).round(2)
+    # riskiest first (descending)
+    df_demo = df_demo.sort_values("DefaultRate", ascending=False)
 
-        for trace in fig_tmp.data:
-            fig_dem.add_trace(trace, row=r, col=c)
+    fig_tmp = px.bar(
+        df_demo,
+        x=col,
+        y="DefaultRate",
+        color="DefaultRate",
+        color_continuous_scale="Blues",
+        labels={
+            col: col.replace("_", " ").title(),
+            "DefaultRate": "Default rate (%)",
+        },
+    )
+    fig_tmp.update_layout(xaxis=dict(tickangle=-35), coloraxis_showscale=False)
+
+    for trace in fig_tmp.data:
+        fig_dem.add_trace(trace, row=r, col=c)
 
 fig_dem.update_layout(
     height=550,
     showlegend=False,
-    title="Default Rate by Demographic Group (safest → riskiest)",
+    title="Default Rate by Demographic Group (riskiest categories on the left)",
     margin=dict(l=30, r=30, t=70, b=40),
     transition_duration=0,
 )
-st.plotly_chart(fig_dem, use_container_width=True)
+st.plotly_chart(fig_dem, width="stretch")
 
 st.markdown(
     """
@@ -288,7 +284,9 @@ st.markdown("---")
 st.header("📅 Age Profile of Defaulters")
 
 age_hist = get_agg("age_defaulters_hist", required=False)
-if not age_hist.empty:
+if age_hist.empty:
+    st.info("Age histogram aggregate not available.")
+else:
     age_hist = age_hist.copy()
     age_hist["bin_mid"] = (age_hist["bin_left"] + age_hist["bin_right"]) / 2
 
@@ -302,9 +300,7 @@ if not age_hist.empty:
     )
     fig_age_def.update_traces(marker_line_width=1.2, marker_line_color="black")
     fig_age_def.update_layout(height=260, transition_duration=0)
-    st.plotly_chart(fig_age_def, use_container_width=True)
-else:
-    st.info("Age histogram aggregate not available.")
+    st.plotly_chart(fig_age_def, width="stretch")
 
 st.markdown(
     """
@@ -315,14 +311,14 @@ st.markdown("---")
 
 
 # ============================================
-# 3. FINANCIAL STRESS – CREDIT / INCOME TREND
+# 3. FINANCIAL STRESS – DEFAULT TREND
 # ============================================
 
 st.header("💰 Financial Stress – How Much Debt Is Too Much?")
 
 credit_default = get_agg("credit_default").copy()
-# CREDIT_BIN, DefaultRate
 credit_default["DefaultRate"] = credit_default["DefaultRate"] * 100
+credit_default = credit_default.dropna(subset=["CREDIT_BIN"])
 
 credit_order = ["0-1x", "1-2x", "2-3x", "3-5x", "5x+"]
 credit_default["CREDIT_BIN"] = pd.Categorical(
@@ -344,7 +340,7 @@ fig_trend = px.line(
 fig_trend.update_traces(line_shape="linear", marker=dict(size=8))
 fig_trend.update_yaxes(ticksuffix="%")
 fig_trend.update_layout(transition_duration=0)
-st.plotly_chart(fig_trend, use_container_width=True)
+st.plotly_chart(fig_trend, width="stretch")
 
 st.markdown(
     """
@@ -357,18 +353,100 @@ st.markdown("---")
 
 
 # ============================================
+# 3B. FINANCIAL STRESS BANDS – DEFAULTERS ONLY
+# ============================================
+
+st.subheader("📊 Where Are Defaulters Concentrated by Stress Band?")
+
+credit_band_def = get_agg("defaulters_credit_band_share", required=False)
+emi_band_def = get_agg("defaulters_emi_band_share", required=False)
+incomepp_band_def = get_agg("defaulters_incomepp_band_share", required=False)
+
+col_fs1, col_fs2 = st.columns(2)
+
+with col_fs1:
+    if not credit_band_def.empty:
+        df_cb = credit_band_def.copy()
+        df_cb["PercentDefaulters"] = df_cb["PercentDefaulters"].round(1)
+        order_cb = ["0-1", "1-2", "2-3", "3-5", "5+"]
+        df_cb["CREDIT_BIN"] = pd.Categorical(df_cb["CREDIT_BIN"], order_cb, ordered=True)
+        df_cb = df_cb.sort_values("CREDIT_BIN")
+
+        fig_cb = px.bar(
+            df_cb,
+            x="CREDIT_BIN",
+            y="PercentDefaulters",
+            title="Defaulters — Credit / Income Ratio Bands",
+            labels={
+                "CREDIT_BIN": "Credit / Income ratio band",
+                "PercentDefaulters": "% of defaulters",
+            },
+            color_discrete_sequence=["#f66d6d"],
+        )
+        fig_cb.update_yaxes(ticksuffix="%")
+        st.plotly_chart(fig_cb, width="stretch")
+
+    if not emi_band_def.empty:
+        df_eb = emi_band_def.copy()
+        df_eb["PercentDefaulters"] = df_eb["PercentDefaulters"].round(1)
+        order_eb = ["0-10%", "10-20%", "20-30%", "30-50%", "50%+"]
+        df_eb["ANNUITY_BIN"] = pd.Categorical(df_eb["ANNUITY_BIN"], order_eb, ordered=True)
+        df_eb = df_eb.sort_values("ANNUITY_BIN")
+
+        fig_eb = px.bar(
+            df_eb,
+            x="ANNUITY_BIN",
+            y="PercentDefaulters",
+            title="Defaulters — EMI / Income Ratio Bands",
+            labels={
+                "ANNUITY_BIN": "EMI / Income ratio band",
+                "PercentDefaulters": "% of defaulters",
+            },
+            color_discrete_sequence=["#f66d6d"],
+        )
+        fig_eb.update_yaxes(ticksuffix="%")
+        st.plotly_chart(fig_eb, width="stretch")
+
+with col_fs2:
+    if not incomepp_band_def.empty:
+        df_ip = incomepp_band_def.copy()
+        df_ip["PercentDefaulters"] = df_ip["PercentDefaulters"].round(1)
+        order_ip = ["<50k", "50-100k", "100-150k", "150-300k", "300k+"]
+        df_ip["INCOME_PP_BIN"] = pd.Categorical(
+            df_ip["INCOME_PP_BIN"], order_ip, ordered=True
+        )
+        df_ip = df_ip.sort_values("INCOME_PP_BIN")
+
+        fig_ip = px.bar(
+            df_ip,
+            x="INCOME_PP_BIN",
+            y="PercentDefaulters",
+            title="Defaulters — Income per Person Bands",
+            labels={
+                "INCOME_PP_BIN": "Income per person band",
+                "PercentDefaulters": "% of defaulters",
+            },
+            color_discrete_sequence=["#f66d6d"],
+        )
+        fig_ip.update_yaxes(ticksuffix="%")
+        st.plotly_chart(fig_ip, width="stretch")
+
+st.markdown("---")
+
+
+# ============================================
 # 4. EXTERNAL SCORE + PAST REFUSAL – BUBBLE
 # ============================================
 
 st.header("🎯 External Score + Past Refusal – Combined Risk")
 
 ext2_bubble = get_agg("ext2_refusal_bubble", required=False)
-if not ext2_bubble.empty:
+if ext2_bubble.empty:
+    st.info("EXT2 × refusal aggregate not available.")
+else:
     ext2_bubble = ext2_bubble.copy()
-    # EXT2_Q, FLAG_EVER_REFUSED, DefaultRate, Count
     label_to_num = {"Q1 (low)": 1, "Q2": 2, "Q3": 3, "Q4 (high)": 4}
     ext2_bubble["EXT2_Q_NUM"] = ext2_bubble["EXT2_Q"].map(label_to_num)
-    # drop any rows where mapping failed
     ext2_bubble = ext2_bubble.dropna(subset=["EXT2_Q_NUM"])
 
     ext2_bubble["DefaultRate"] = ext2_bubble["DefaultRate"] * 100
@@ -398,7 +476,6 @@ if not ext2_bubble.empty:
     )
 
     quartile_ticks = sorted(ext2_bubble["EXT2_Q_NUM"].unique())
-    # ensure only finite values and cast to int safely
     quartile_ticks = [int(q) for q in quartile_ticks if np.isfinite(q)]
 
     fig_bubble.update_xaxes(
@@ -409,9 +486,6 @@ if not ext2_bubble.empty:
     fig_bubble.update_yaxes(ticksuffix="%")
     fig_bubble.update_layout(transition_duration=0)
     st.plotly_chart(fig_bubble, width="stretch")
-else:
-    st.info("EXT2 × refusal aggregate not available.")
-
 
 st.markdown(
     """
@@ -436,10 +510,10 @@ with col1:
     refuse_def = refuse_def.copy()
     refuse_def["DefaultRate"] = refuse_def["DefaultRate"] * 100
     refuse_def = refuse_def.set_index("FLAG_EVER_REFUSED").reindex([0, 1]).reset_index()
-    refuse_labels = ["No previous refusal", "Had previous refusal"]
+    labels_ref = ["No previous refusal", "Had previous refusal"]
 
     fig_refuse = px.bar(
-        x=refuse_labels,
+        x=labels_ref,
         y=refuse_def["DefaultRate"].values,
         title="Default Rate by Refusal History",
         labels={"x": "Refusal history", "y": "Default rate (%)"},
@@ -447,7 +521,7 @@ with col1:
     )
     fig_refuse.update_yaxes(ticksuffix="%")
     fig_refuse.update_layout(transition_duration=0)
-    st.plotly_chart(fig_refuse, use_container_width=True)
+    st.plotly_chart(fig_refuse, width="stretch")
 
 with col2:
     apps_def = get_agg("prev_apps_default")
@@ -468,7 +542,7 @@ with col2:
     )
     fig_apps.update_yaxes(ticksuffix="%")
     fig_apps.update_layout(transition_duration=0)
-    st.plotly_chart(fig_apps, use_container_width=True)
+    st.plotly_chart(fig_apps, width="stretch")
 
 st.markdown(
     """
@@ -491,7 +565,9 @@ col1, col2 = st.columns([2, 1])
 with col1:
     ext2_def = get_agg("ext2_quartile_default")
     ext2_def = ext2_def.copy()
+    ext2_def = ext2_def.dropna(subset=["EXT2_Q"])
     ext2_def["DefaultRate"] = ext2_def["DefaultRate"] * 100
+
     order_q = ["Q1 (low)", "Q2", "Q3", "Q4 (high)"]
     ext2_def["EXT2_Q"] = pd.Categorical(ext2_def["EXT2_Q"], order_q, ordered=True)
     ext2_def = ext2_def.sort_values("EXT2_Q")
@@ -505,7 +581,7 @@ with col1:
     )
     fig_ext2.update_yaxes(ticksuffix="%")
     fig_ext2.update_layout(transition_duration=0)
-    st.plotly_chart(fig_ext2, use_container_width=True)
+    st.plotly_chart(fig_ext2, width="stretch")
 
 with col2:
     st.markdown(
@@ -556,7 +632,7 @@ fig_risk = px.bar(
 )
 fig_risk.update_yaxes(ticksuffix="%")
 fig_risk.update_layout(transition_duration=0)
-st.plotly_chart(fig_risk, use_container_width=True)
+st.plotly_chart(fig_risk, width="stretch")
 
 st.markdown(
     """
@@ -573,15 +649,16 @@ st.markdown("---")
 st.header("📈 Risk Profile Comparison – Radar Chart")
 
 radar_means = get_agg("radar_means", required=False)
-if not radar_means.empty:
+if radar_means.empty:
+    st.info("Radar aggregate not available.")
+else:
     radar_means = radar_means.copy()
-    # radar_means: TARGET, col1, col2, ...
     radar_means["TARGET"] = radar_means["TARGET"].astype(int)
     radar_means = radar_means.set_index("TARGET").T  # rows=features, cols=TARGET
 
-    # Normalize 0-1 per feature
     radar_norm = radar_means.apply(
-        lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9), axis=1
+        lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9),
+        axis=1,
     )
 
     labels = radar_norm.index.tolist()
@@ -589,7 +666,8 @@ if not radar_means.empty:
     angles += angles[:1]
 
     fig_radar, ax_radar = plt.subplots(
-        figsize=(3.8, 3.8), subplot_kw=dict(polar=True)
+        figsize=(3.8, 3.8),
+        subplot_kw=dict(polar=True),
     )
 
     if 0 in radar_norm.columns:
@@ -615,12 +693,10 @@ if not radar_means.empty:
     ax_radar.legend(bbox_to_anchor=(1.05, 1.0), borderaxespad=0.0, fontsize=7)
     plt.tight_layout(pad=0.8)
 
-    st.pyplot(fig_radar, use_container_width=True)
+    st.pyplot(fig_radar, width="stretch")
 
     st.markdown(
         """
 **Insight:** The red shape (defaulters) bulges where debt burdens and refusals are higher and external scores weaker, while the green shape (non‑defaulters) shows lower leverage and stronger scores.
 """
     )
-else:
-    st.info("Radar aggregate not available.")
