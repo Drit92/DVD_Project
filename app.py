@@ -425,7 +425,7 @@ if len(radar_cols) >= 3:
     angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
     angles += angles[:1]  # close loop
 
-    fig_radar, ax_radar = plt.subplots(figsize=(4, 4), subplot_kw=dict(polar=True))
+    fig_radar, ax_radar = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
 
     # Non-defaulters (TARGET=0)
     if 0 in radar_norm.columns:
