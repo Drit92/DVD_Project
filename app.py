@@ -54,7 +54,7 @@ with col2:
     c3.metric("Total Good Borrowers", f"{(1-df['TARGET']).sum():,}")
 
 st.markdown("""
-**Plain‑language story:**
+**Overview:**
 - Most customers repay on time; only a small share (about 8%) default.
 - Because defaulters are rare, any risk model must treat this as an imbalanced problem.
 """)
