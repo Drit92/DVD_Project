@@ -102,10 +102,11 @@ st.markdown("""
 # --- Overall applicant age distribution ---
 st.subheader("Applicant Age Distribution")
 
+# AGE_YEARS is created in df (engineered features), not in raw app_data
 fig_age_all, ax_age_all = plt.subplots(figsize=(5, 3))
 
 sns.histplot(
-    app_data['AGE_YEARS'],
+    df['AGE_YEARS'],        # <-- use df instead of app_data
     bins=20,
     kde=True,
     color="#4C72B0",
@@ -124,6 +125,7 @@ st.markdown("""
 - Most applicants are in the **working‑age band (roughly late 20s to early 50s)**.
 - Very young and very old borrowers form a **small share of the portfolio**, so age effects on default should be interpreted together with income and employment stability.
 """)
+
 
 st.markdown("---")
 
