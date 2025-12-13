@@ -62,6 +62,74 @@ st.markdown("""
 
 st.markdown("---")
 
+
+# === 1A. BORROWER PROFILES ===
+st.header("🧍 Borrower Profiles – Who Applies?")
+
+# --- Gender distribution  ---
+st.subheader("Applicant Gender Mix")
+
+gender_df = app_data[app_data['CODE_GENDER'] != 'XNA'].copy()
+gender_counts = gender_df['CODE_GENDER'].value_counts()
+
+fig_gender_pie = go.Figure(
+    data=[
+        go.Pie(
+            labels=gender_counts.index,
+            values=gender_counts.values,
+            hole=0.4,
+            marker_colors=['#4C72B0', '#DD8452'],   # e.g. Female, Male (order follows counts.index)
+            textinfo='label+percent',
+            textposition='outside'
+        )
+    ]
+)
+fig_gender_pie.update_layout(
+    title="Share of Applicants by Gender",
+    margin=dict(t=60, l=10, r=10, b=10),
+    showlegend=False
+)
+
+st.plotly_chart(fig_gender_pie, use_container_width=True)
+
+st.markdown("""
+**Insight:**
+- Male applicants show a **higher default rate (≈10%)** than female applicants (≈7%) despite similar scale.
+- Gender differences may reflect underlying factors like **income, loan size, or job type**, so they should be analysed jointly with other variables before informing policy.
+""")
+
+
+# --- Overall applicant age distribution ---
+st.subheader("Applicant Age Distribution")
+
+fig_age_all, ax_age_all = plt.subplots(figsize=(5, 3))
+
+sns.histplot(
+    app_data['AGE_YEARS'],
+    bins=20,
+    kde=True,
+    color="#4C72B0",
+    ax=ax_age_all
+)
+ax_age_all.set_title("Distribution of Loan Applicant Age", fontsize=11)
+ax_age_all.set_xlabel("Age (years)")
+ax_age_all.set_ylabel("Number of applicants")
+ax_age_all.grid(True, axis="y", linestyle="--", alpha=0.3)
+plt.tight_layout(pad=1.0)
+
+st.pyplot(fig_age_all, width="content")
+
+st.markdown("""
+**Insight:**
+- Most applicants are in the **working‑age band (roughly late 20s to early 50s)**.
+- Very young and very old borrowers form a **small share of the portfolio**, so age effects on default should be interpreted together with income and employment stability.
+""")
+
+st.markdown("---")
+
+
+
+
 # === 2. DEMOGRAPHICS – CLEAN LAYOUT, ASCENDING BARS ===
 st.header("👥 Demographic Segments – Who Is Riskier?")
 
