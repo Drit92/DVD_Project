@@ -251,41 +251,50 @@ st.markdown("""
 
 st.markdown("---")
 
-# === 3. FINANCIAL STRESS + TREND ===
+# === 3. FINANCIAL STRESS – HOW MUCH DEBT IS TOO MUCH? ===
 st.header("💰 Financial Stress – How Much Debt Is Too Much?")
+
+# Use defaulters-only data to measure where defaulters are concentrated
+df_def = df[df['TARGET'] == 1].copy()
 
 col1, col2 = st.columns(2)
 
-# Use defaulters-only view to match the “% of defaulters in each band” idea
-df_def = df[df['TARGET'] == 1].copy()
-
 with col1:
-    # Frequency of defaulters in each credit band (percentage of defaulters)
+    # % of defaulters falling into each credit/income band
     credit_freq = df_def['CREDIT_BIN'].value_counts(normalize=True).sort_index() * 100
     fig_credit = px.bar(
         x=credit_freq.index.astype(str),
         y=credit_freq.values,
-        title="Defaulters — Credit / Income Ratio Bands",
-        labels={'x': 'Credit / income ratio band', 'y': '% of defaulters in this band'},
+        title="Defaulters by Credit / Income Ratio Band",
+        labels={
+            'x': 'Credit amount as multiple of annual income',
+            'y': '% of all defaulters in this band'
+        },
         color_discrete_sequence=['#dc3545']
     )
     fig_credit.update_yaxes(range=[0, 100], ticksuffix="%", title='% of defaulters')
     st.plotly_chart(fig_credit, width='stretch')
 
 with col2:
-    annuity_freq = df_def['EMI_BIN'].value_counts(normalize=True).sort_index() * 100
+    # % of defaulters falling into each EMI/income band
+    emi_freq = df_def['EMI_BIN'].value_counts(normalize=True).sort_index() * 100
     fig_emi = px.bar(
-        x=annuity_freq.index.astype(str),
-        y=annuity_freq.values,
-        title="Defaulters — EMI / Income Ratio Bands",
-        labels={'x': 'EMI / income ratio band', 'y': '% of defaulters in this band'},
+        x=emi_freq.index.astype(str),
+        y=emi_freq.values,
+        title="Defaulters by EMI / Income Ratio Band",
+        labels={
+            'x': 'Monthly EMI as % of income',
+            'y': '% of all defaulters in this band'
+        },
         color_discrete_sequence=['#fd7e14']
     )
     fig_emi.update_yaxes(range=[0, 100], ticksuffix="%", title='% of defaulters')
     st.plotly_chart(fig_emi, width='stretch')
 
-
 st.subheader("📈 Trend: Credit Stress vs Default Rate")
+
+# Here we look at default rate, not just share of defaulters
+credit_order = ['0-1x', '1-2x', '2-3x', '3-5x', '5x+']
 trend_df = df.groupby('CREDIT_BIN', observed=True)['TARGET'].mean().reset_index()
 trend_df['TARGET'] = trend_df['TARGET'] * 100
 trend_df = trend_df.set_index('CREDIT_BIN').reindex(credit_order).reset_index()
@@ -295,19 +304,19 @@ fig_trend = px.line(
     x='CREDIT_BIN',
     y='TARGET',
     markers=True,
-    title="Default Trend Across Credit / Income Buckets",
-    labels={'CREDIT_BIN': 'Credit / Income bucket', 'TARGET': 'Default rate (%)'},
+    title="Default Rate Across Credit / Income Buckets",
+    labels={'CREDIT_BIN': 'Credit / income bucket', 'TARGET': 'Default rate (%)'},
     color_discrete_sequence=['#dc3545']
 )
 fig_trend.update_traces(line_shape='linear', marker=dict(size=10, color='#dc3545'))
-fig_trend.update_yaxes(tickformat=".0%")
+fig_trend.update_yaxes(ticksuffix="%", title='Default rate (%)')
 st.plotly_chart(fig_trend, width='stretch')
 
 st.markdown("""
 **Story:**
-- When loans reach **3–5× annual income**, default risk jumps sharply.
-- EMIs above **20% of income** create serious repayment pressure.
-- Sensible policy: avoid approving loans above **4× income** and EMI above **25% of income**.
+- Bars show where **defaulters are concentrated**: mid‑to‑high credit and EMI bands hold the largest share of bad loans.
+- The line chart shows that default rate **rises steadily** as credit/income increases, especially beyond **3× income**.
+- Practical rule of thumb: avoid loans above **4× income** and EMIs above **25% of income**.
 """)
 
 st.markdown("---")
