@@ -499,10 +499,10 @@ else:
     fig_bubble = px.scatter(
         ext2_bubble,
         x="EXT2_Q_NUM",
-        y="DefaultRate_jitter",          # jittered for spacing
+        y="DefaultRate_jitter",
         size="Count",
         color="REFUSAL_STR",
-        size_max=60,
+        size_max=25,                 # was 60 – much smaller bubbles
         color_discrete_map={"No refusal": "green", "Had refusal": "red"},
         labels={
             "EXT2_Q_NUM": "External score quartile (higher = safer)",
@@ -510,8 +510,9 @@ else:
             "REFUSAL_STR": "Previous refusal",
         },
         title="External Score vs Past Refusal (Bubble Size = Number of Customers)",
-        hover_data={"DefaultRate": ':.2f'}  # show true % in hover
+        hover_data={"DefaultRate": ':.2f'}
     )
+
 
     quartile_ticks = sorted(ext2_bubble["EXT2_Q_NUM"].unique())
     fig_bubble.update_xaxes(
