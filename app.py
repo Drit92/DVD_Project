@@ -160,6 +160,7 @@ bubble_final = pd.DataFrame({
 
 fig_bubble, ax = plt.subplots(figsize=(8, 5))
 
+# 0 -> No (green), 1 -> Yes (red)
 sns.scatterplot(
     data=bubble_final,
     x='EXT2_Q',
@@ -167,27 +168,27 @@ sns.scatterplot(
     size='Count',
     hue='FLAG_EVER_REFUSED',
     sizes=(50, 800),
-    palette=['green', 'red'],   # 0 -> green (No), 1 -> red (Yes)
+    palette={0: 'green', 1: 'red'},
     alpha=0.6,
-    ax=ax
+    ax=ax,
+    legend=False   # turn off Seaborn's auto legend
 )
 
 ax.set_title("External Score vs Behaviour – Bubble Plot (Size = # Customers)")
 ax.set_xlabel("External Score Quartile (Higher = Safer)")
 ax.set_ylabel("Default Rate (%)")
 
-# Bring back grid lines
+# Grid lines back
 ax.grid(True, which="both", axis="both", linestyle="--", alpha=0.4)
 
-# Build clean legend from handles
-handles, _ = ax.get_legend_handles_labels()
-# Seaborn creates legend entries: size levels + hue levels. Keep only last two for hue.
-h_refusal = handles[-2:]
-labels_refusal = ["No", "Yes"]  # 0 = No previous refusal, 1 = Yes
-
-leg = ax.legend(
-    h_refusal,
-    labels_refusal,
+# Custom legend with correct colors
+from matplotlib.patches import Patch
+legend_handles = [
+    Patch(facecolor='green', edgecolor='black', label='No'),
+    Patch(facecolor='red', edgecolor='black', label='Yes')
+]
+ax.legend(
+    handles=legend_handles,
     title="Had Previous Refusal",
     loc='upper left',
     bbox_to_anchor=(1.05, 1),
@@ -198,8 +199,8 @@ st.pyplot(fig_bubble, width="stretch")
 
 st.markdown("""
 **🔍 Insights:**
-- Within each external‑score band, customers with **past refusals (“Yes”)** have higher default rates.
-- Larger bubbles indicate more customers; safe, large green bubbles in higher quartiles are prime targets.
+- Within each external‑score band, customers with **past refusals (“Yes”)** sit at higher default rates.
+- Large green bubbles in safer quartiles highlight stable, low‑risk customers.
 """)
 
 
