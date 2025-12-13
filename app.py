@@ -78,11 +78,15 @@ with col1:
         )
     ])
     fig_donut.update_layout(
-        title="Share of Good Borrowers vs Defaulters",
+        title=dict(
+            text="Share of Good Borrowers vs Defaulters",
+            y=0.96  # slightly lower title
+        ),
         height=260,
-        margin=dict(t=40, b=10)
+        margin=dict(t=80, b=10, l=10, r=10)  # more top margin pushes chart down
     )
     st.plotly_chart(fig_donut, width="stretch")
+
 
 with col2:
     c1, c2, c3 = st.columns(3)
