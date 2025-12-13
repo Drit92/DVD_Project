@@ -516,7 +516,7 @@ fig_risk = px.bar(
     },
     color_discrete_sequence=["#fd7e14"],
 )
-fig_risk.update_y_axes = fig_risk.update_yaxes(ticksuffix="%")
+fig_risk.update_yaxes(ticksuffix="%")
 fig_risk.update_layout(transition_duration=0)
 st.plotly_chart(fig_risk, width="stretch")
 
