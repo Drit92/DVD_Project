@@ -331,7 +331,8 @@ credit_band_def = get_agg("defaulters_credit_band_share", required=False)
 emi_band_def = get_agg("defaulters_emi_band_share", required=False)
 incomepp_band_def = get_agg("defaulters_incomepp_band_share", required=False)
 
-col_fs1, col_fs2 = st.columns(2)
+# 3 columns: credit bands, EMI bands, income bands + insight text
+col_fs1, col_fs2, col_fs3 = st.columns([1.2, 1.2, 1.4])
 
 with col_fs1:
     if not credit_band_def.empty:
@@ -355,6 +356,7 @@ with col_fs1:
         fig_cb.update_yaxes(ticksuffix="%")
         st.plotly_chart(fig_cb, width="stretch")
 
+with col_fs2:
     if not emi_band_def.empty:
         df_eb = emi_band_def.copy()
         df_eb["PercentDefaulters"] = df_eb["PercentDefaulters"].round(1)
@@ -376,7 +378,7 @@ with col_fs1:
         fig_eb.update_yaxes(ticksuffix="%")
         st.plotly_chart(fig_eb, width="stretch")
 
-with col_fs2:
+with col_fs3:
     if not incomepp_band_def.empty:
         df_ip = incomepp_band_def.copy()
         df_ip["PercentDefaulters"] = df_ip["PercentDefaulters"].round(1)
@@ -400,15 +402,29 @@ with col_fs2:
         fig_ip.update_yaxes(ticksuffix="%")
         st.plotly_chart(fig_ip, width="stretch")
 
-# ---- 3C. LINE TREND AFTER THE THREE CHARTS ----
+    # Insight text in the remaining vertical space
+    st.markdown(
+        """
+**Key takeaway**
+
+Default risk increases significantly as financial stress increases, but risk peaks at **mid‑level stress** rather than at the extremes.
+
+**Final report narrative**
+
+- Borrowers with **medium‑high debt load (credit/income 3–5×)** show the highest default probability (≈31% of defaulters).  
+- EMI affordability risk is highest for **10–20% EMI borrowers (~47%)**, so moderately leveraged consumers can be riskier than heavily leveraged ones.  
+- Per‑person income is a strong protective factor: above **300k per person**, default risk becomes almost negligible.
+"""
+    )
+
+# ---- 3C. LINE TREND ACROSS BUCKETS (FULL WIDTH) ----
 st.subheader("📈 Default Trend Across Financial Stress Buckets")
 
 credit_default = get_agg("credit_default").copy()
 if credit_default.empty:
     st.info("Credit / income default aggregate not available.")
 else:
-    # Remove NaN bin and keep bins in the expected order
-    valid_bins = ["0–1x", "1–2x", "2–3x", "3–5x", "5x+"]  # match labels from Colab
+    valid_bins = ["0–1x", "1–2x", "2–3x", "3–5x", "5x+"]  # match Colab labels
     credit_default = credit_default.dropna(subset=["CREDIT_BIN"])
     credit_default = credit_default[credit_default["CREDIT_BIN"].isin(valid_bins)]
 
@@ -434,23 +450,16 @@ else:
         )
         fig_trend.update_traces(line_shape="linear", marker=dict(size=8))
         fig_trend.update_yaxes(ticksuffix="%")
+        st.plotly_chart(fig_trend, width="stretch")
 
-        col_line_l, col_line_r = st.columns([2, 1])
+        st.markdown(
+            """
+The default rate increases as the credit/income ratio rises from **0–1×** to **2–3×**, peaking around **8.5–9%**.  
+After **2–3×**, the default rate declines, indicating lower default risk for the highest credit/income bands.
 
-        with col_line_l:
-            st.plotly_chart(fig_trend, width="stretch")
-
-        with col_line_r:
-            st.markdown(
-                """
-**Line‑chart insights:**
-
-- Default rate **rises steadily** as the loan amount grows relative to income, 
-  with a clear jump beyond **3× income**.
-- Keeping credit exposure below about **4× annual income** keeps default risk in a
-  more stable band; above that, the curve bends upward sharply.
+The curve peaks in the **middle of the stress range (2–3×)** and then falls, suggesting a **non‑linear relationship** where borrowers with moderate financial stress can be riskier than those at the very low or very high ends.
 """
-            )
+        )
 
 st.markdown("---")
 
