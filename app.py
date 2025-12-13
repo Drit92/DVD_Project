@@ -17,9 +17,10 @@ st.markdown("---")
 @st.cache_data(show_spinner="🔄 Loading + Engineering Data...")
 def load_data():
     app_data, prev_data = load_raw_data()
-    return engineer_features(app_data, prev_data)
+    df = engineer_features(app_data, prev_data)
+    return app_data, df
 
-df = load_data()
+app_data, df = load_data()
 st.success(f"✅ Loaded {len(df):,} records | 🔴 Default Rate: {df['TARGET'].mean():.1%}")
 
 # === 1. PORTFOLIO OVERVIEW ===
@@ -54,7 +55,7 @@ with col2:
     c3.metric("Total Good Borrowers", f"{(1-df['TARGET']).sum():,}")
 
 st.markdown("""
-**Overview:**
+**Plain‑language story:**
 - Most customers repay on time; only a small share (about 8%) default.
 - Because defaulters are rare, any risk model must treat this as an imbalanced problem.
 """)
@@ -115,8 +116,8 @@ st.plotly_chart(fig_dem, width='stretch')
 
 st.markdown("""
 **Story:**
-- Each subplot shows categories ordered from **highest** to **lowest** default rate, exactly as in the Colab EDA.
-- For income type, this ensures **Maternity leave** sits above **Unemployed**, matching the notebook’s analysis.
+- Each subplot orders categories from **highest** to **lowest** default rate, exactly as in the Colab EDA.
+- For income type, this makes **Maternity leave** appear above **Unemployed**, matching the notebook.
 """)
 
 st.markdown("---")
