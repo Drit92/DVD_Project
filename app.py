@@ -460,33 +460,14 @@ with col1:
 with col2:
     st.markdown(
         """
-    **Insights:**
-    - The **lowest external‑score quartile (Q1)** has several times the default rate of the **highest quartile (Q4)**.
-    - Default probability **falls smoothly** as external score improves, making this one of the strongest early‑screening tools.
-    """
+        **Key Insights:**
+        - **Lowest quartile (Q1)** shows significantly higher default rates than **highest quartile (Q4)**.
+        - Default probability decreases steadily as external scores improve, making this a powerful screening tool.
+        """
     )
 
 st.markdown("---")
 
-fig_hist = px.histogram(
-    df,
-    x="EXT_SOURCE_2",
-    color="TARGET",
-    nbins=50,
-    title="Distribution of External Scores for Good Borrowers vs Defaulters",
-    labels={"EXT_SOURCE_2": "External credit score", "count": "Number of applicants"},
-    color_discrete_map={0: "#28a745", 1: "#dc3545"},
-)
-fig_hist.update_traces(marker_line_width=1.2, marker_line_color="black")
-fig_hist.update_layout(height=350, legend_title="Default status", transition_duration=0)
-for trace in fig_hist.data:
-    if trace.name == "0":
-        trace.name = "Good borrower (0)"
-    elif trace.name == "1":
-        trace.name = "Defaulter (1)"
-st.plotly_chart(fig_hist, width="stretch")
-
-st.markdown("---")
 
 # === 7. COMBINED RISK SCORE ===
 st.header("🎯 Combined Risk Score – One Number That Combines All Risk Flags")
