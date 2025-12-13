@@ -113,7 +113,7 @@ st.markdown("""
 st.markdown("---")
 
 # === 2A. AGE DISTRIBUTION – DEFAULTERS ONLY ===
-st.header("🎂 Age Profile of Defaulters")
+st.header("📅 Age Profile of Defaulters")
 
 # Recreate defaulter-only cleaned dataset as in Colab
 df_def = df[df['TARGET'] == 1].copy()
