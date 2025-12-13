@@ -72,18 +72,22 @@ st.subheader("Applicant Gender Mix")
 gender_df = app_data[app_data['CODE_GENDER'] != 'XNA'].copy()
 gender_counts = gender_df['CODE_GENDER'].value_counts()
 
+label_map = {'M': 'Male', 'F': 'Female'}
+labels = [label_map.get(g, g) for g in gender_counts.index]
+
 fig_gender_pie = go.Figure(
     data=[
         go.Pie(
-            labels=gender_counts.index,
+            labels=labels,
             values=gender_counts.values,
             hole=0.4,
-            marker_colors=['#4C72B0', '#DD8452'],   # e.g. Female, Male (order follows counts.index)
+            marker_colors=['#4C72B0', '#DD8452'],
             textinfo='label+percent',
             textposition='outside'
         )
     ]
 )
+
 fig_gender_pie.update_layout(
     title="Share of Applicants by Gender",
     margin=dict(t=60, l=10, r=10, b=10),
@@ -252,33 +256,34 @@ st.header("💰 Financial Stress – How Much Debt Is Too Much?")
 
 col1, col2 = st.columns(2)
 
+# Use defaulters-only view to match the “% of defaulters in each band” idea
+df_def = df[df['TARGET'] == 1].copy()
+
 with col1:
-    credit_def = df.groupby('CREDIT_BIN', observed=True)['TARGET'].mean() * 100
-    credit_order = ['0-1x', '1-2x', '2-3x', '3-5x', '5x+']
-    credit_def = credit_def.reindex(credit_order)
+    # Frequency of defaulters in each credit band (percentage of defaulters)
+    credit_freq = df_def['CREDIT_BIN'].value_counts(normalize=True).sort_index() * 100
     fig_credit = px.bar(
-        x=credit_def.index.astype(str),
-        y=credit_def.values,
-        title="Default Rate by Credit / Income Multiple",
-        labels={'x': 'Credit amount as multiple of annual income', 'y': 'Default rate (%)'},
+        x=credit_freq.index.astype(str),
+        y=credit_freq.values,
+        title="Defaulters — Credit / Income Ratio Bands",
+        labels={'x': 'Credit / income ratio band', 'y': '% of defaulters in this band'},
         color_discrete_sequence=['#dc3545']
     )
-    fig_credit.update_yaxes(tickformat=".0%")
+    fig_credit.update_yaxes(range=[0, 100], ticksuffix="%", title='% of defaulters')
     st.plotly_chart(fig_credit, width='stretch')
 
 with col2:
-    emi_def = df.groupby('EMI_BIN', observed=True)['TARGET'].mean() * 100
-    emi_order = ['<10%', '10-20%', '20-30%', '30-50%', '50%+']
-    emi_def = emi_def.reindex(emi_order)
+    annuity_freq = df_def['EMI_BIN'].value_counts(normalize=True).sort_index() * 100
     fig_emi = px.bar(
-        x=emi_def.index.astype(str),
-        y=emi_def.values,
-        title="Default Rate by EMI / Income Percentage",
-        labels={'x': 'Monthly EMI as % of income', 'y': 'Default rate (%)'},
+        x=annuity_freq.index.astype(str),
+        y=annuity_freq.values,
+        title="Defaulters — EMI / Income Ratio Bands",
+        labels={'x': 'EMI / income ratio band', 'y': '% of defaulters in this band'},
         color_discrete_sequence=['#fd7e14']
     )
-    fig_emi.update_yaxes(tickformat=".0%")
+    fig_emi.update_yaxes(range=[0, 100], ticksuffix="%", title='% of defaulters')
     st.plotly_chart(fig_emi, width='stretch')
+
 
 st.subheader("📈 Trend: Credit Stress vs Default Rate")
 trend_df = df.groupby('CREDIT_BIN', observed=True)['TARGET'].mean().reset_index()
