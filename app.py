@@ -707,21 +707,21 @@ else:
     angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
     angles += angles[:1]
 
-    # very small base figure; dpi controls actual pixel size
+    # very small figure + large margins
     fig_radar, ax_radar = plt.subplots(
-        figsize=(1.6, 1.6),          # much smaller than before
+        figsize=(1.5, 1.5),
         subplot_kw=dict(polar=True),
-        dpi=80,                      # small pixel canvas
+        dpi=100,
     )
 
     if 0 in radar_norm.columns:
         vals0 = radar_norm[0].tolist() + radar_norm[0].tolist()[:1]
-        ax_radar.plot(angles, vals0, linewidth=1.2, label="Non-Defaulters (0)", color="green")
+        ax_radar.plot(angles, vals0, linewidth=1.0, label="Non-Defaulters (0)", color="green")
         ax_radar.fill(angles, vals0, alpha=0.25, color="green")
 
     if 1 in radar_norm.columns:
         vals1 = radar_norm[1].tolist() + radar_norm[1].tolist()[:1]
-        ax_radar.plot(angles, vals1, linewidth=1.2, label="Defaulters (1)", color="red")
+        ax_radar.plot(angles, vals1, linewidth=1.0, label="Defaulters (1)", color="red")
         ax_radar.fill(angles, vals1, alpha=0.25, color="red")
 
     ax_radar.set_xticks(angles[:-1])
@@ -729,14 +729,18 @@ else:
     ax_radar.set_ylim(0, 1)
     ax_radar.set_yticklabels([])
 
-    ax_radar.set_title("Risk Profile Comparison – Radar Chart", pad=4, fontsize=8)
-    ax_radar.legend(bbox_to_anchor=(1.05, 1.0), borderaxespad=0.0, fontsize=5)
+    # big margins around the plot inside the small figure
+    fig_radar.subplots_adjust(left=0.25, right=0.75, top=0.75, bottom=0.25)
 
-    # no tight_layout; let Streamlit scale it with container width / zoom
-    st.pyplot(fig_radar, use_container_width=True)
+    ax_radar.set_title("Risk Profile Comparison – Radar Chart", pad=6, fontsize=7)
+    ax_radar.legend(bbox_to_anchor=(1.2, 1.0), borderaxespad=0.0, fontsize=5)
+
+    # render as static image with fixed width so it shrinks when zooming out
+    buf = io.BytesIO()
+    fig_radar.savefig(buf, format="png", bbox_inches="tight")
+    buf.seek(0)
+    st.image(buf, width=220)  # small, with significant white margin
 
     st.markdown(
         """
-**Insight:** The red shape (defaulters) bulges where debt burdens and refusals are higher and external scores weaker, while the green shape (non‑defaulters) shows lower leverage and stronger scores.
-"""
-    )
+**Insight:** The red shape (defaulters) bulges where debt burdens and refusals are higher and external scores
