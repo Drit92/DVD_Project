@@ -158,7 +158,6 @@ bubble_final = pd.DataFrame({
     'Count': bubble_count
 }).reset_index()
 
-# Matplotlib / Seaborn bubble chart (matches Colab)
 fig_bubble, ax = plt.subplots(figsize=(8, 5))
 
 sns.scatterplot(
@@ -168,7 +167,7 @@ sns.scatterplot(
     size='Count',
     hue='FLAG_EVER_REFUSED',
     sizes=(50, 800),
-    palette=['green', 'red'],
+    palette=['green', 'red'],   # 0 -> green (No), 1 -> red (Yes)
     alpha=0.6,
     ax=ax
 )
@@ -176,21 +175,33 @@ sns.scatterplot(
 ax.set_title("External Score vs Behaviour – Bubble Plot (Size = # Customers)")
 ax.set_xlabel("External Score Quartile (Higher = Safer)")
 ax.set_ylabel("Default Rate (%)")
-ax.legend(
+
+# Bring back grid lines
+ax.grid(True, which="both", axis="both", linestyle="--", alpha=0.4)
+
+# Build clean legend from handles
+handles, _ = ax.get_legend_handles_labels()
+# Seaborn creates legend entries: size levels + hue levels. Keep only last two for hue.
+h_refusal = handles[-2:]
+labels_refusal = ["No", "Yes"]  # 0 = No previous refusal, 1 = Yes
+
+leg = ax.legend(
+    h_refusal,
+    labels_refusal,
     title="Had Previous Refusal",
-    labels=["No", "Yes"],
     loc='upper left',
-    bbox_to_anchor=(1.05, 1)
+    bbox_to_anchor=(1.05, 1),
+    borderaxespad=0.
 )
 
 st.pyplot(fig_bubble, width="stretch")
 
 st.markdown("""
 **🔍 Insights:**
-- Within each external‑score band, customers **with past refusals** sit at higher default rates.
-- Large green bubbles in safer quartiles = strong, stable customer base.
-- Small but risky red bubbles in low quartiles = focused high‑risk pockets.
+- Within each external‑score band, customers with **past refusals (“Yes”)** have higher default rates.
+- Larger bubbles indicate more customers; safe, large green bubbles in higher quartiles are prime targets.
 """)
+
 
 st.markdown("---")
 
