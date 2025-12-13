@@ -366,9 +366,11 @@ ext2_bubble = get_agg("ext2_refusal_bubble", required=False)
 if not ext2_bubble.empty:
     ext2_bubble = ext2_bubble.copy()
     # EXT2_Q, FLAG_EVER_REFUSED, DefaultRate, Count
-    # Map quartiles to numeric for x-axis
     label_to_num = {"Q1 (low)": 1, "Q2": 2, "Q3": 3, "Q4 (high)": 4}
-    ext2_bubble["EXT2_Q_NUM"] = ext2_bubble["EXT2_Q"].map(label_to_num).astype(float)
+    ext2_bubble["EXT2_Q_NUM"] = ext2_bubble["EXT2_Q"].map(label_to_num)
+    # drop any rows where mapping failed
+    ext2_bubble = ext2_bubble.dropna(subset=["EXT2_Q_NUM"])
+
     ext2_bubble["DefaultRate"] = ext2_bubble["DefaultRate"] * 100
     ext2_bubble["REFUSAL_STR"] = ext2_bubble["FLAG_EVER_REFUSED"].map(
         {0: "No refusal", 1: "Had refusal"}
@@ -394,17 +396,22 @@ if not ext2_bubble.empty:
         },
         title="External Score vs Past Refusal (Bubble Size = Number of Customers)",
     )
+
     quartile_ticks = sorted(ext2_bubble["EXT2_Q_NUM"].unique())
+    # ensure only finite values and cast to int safely
+    quartile_ticks = [int(q) for q in quartile_ticks if np.isfinite(q)]
+
     fig_bubble.update_xaxes(
         tickmode="array",
         tickvals=quartile_ticks,
-        ticktext=[f"Q{int(q)}" for q in quartile_ticks],
+        ticktext=[f"Q{q}" for q in quartile_ticks],
     )
     fig_bubble.update_yaxes(ticksuffix="%")
     fig_bubble.update_layout(transition_duration=0)
-    st.plotly_chart(fig_bubble, use_container_width=True)
+    st.plotly_chart(fig_bubble, width="stretch")
 else:
     st.info("EXT2 × refusal aggregate not available.")
+
 
 st.markdown(
     """
