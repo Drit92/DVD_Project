@@ -331,8 +331,8 @@ credit_band_def = get_agg("defaulters_credit_band_share", required=False)
 emi_band_def = get_agg("defaulters_emi_band_share", required=False)
 incomepp_band_def = get_agg("defaulters_incomepp_band_share", required=False)
 
-# 3 columns: credit bands, EMI bands, income bands + insight text
-col_fs1, col_fs2, col_fs3 = st.columns([1.2, 1.2, 1.4])
+# First row: credit bands + EMI bands + income bands (narrow)
+col_fs1, col_fs2, col_fs3 = st.columns([1.1, 1.1, 0.9])
 
 with col_fs1:
     if not credit_band_def.empty:
@@ -402,9 +402,9 @@ with col_fs3:
         fig_ip.update_yaxes(ticksuffix="%")
         st.plotly_chart(fig_ip, width="stretch")
 
-    # Insight text in the remaining vertical space
-    st.markdown(
-        """
+# Second row: full-width insight text, spans entire page under the three charts
+st.markdown(
+    """
 **Key takeaway**
 
 Default risk increases significantly as financial stress increases, but risk peaks at **mid‑level stress** rather than at the extremes.
@@ -415,7 +415,8 @@ Default risk increases significantly as financial stress increases, but risk pea
 - EMI affordability risk is highest for **10–20% EMI borrowers (~47%)**, so moderately leveraged consumers can be riskier than heavily leveraged ones.  
 - Per‑person income is a strong protective factor: above **300k per person**, default risk becomes almost negligible.
 """
-    )
+)
+
 
 # ---- 3C. LINE TREND ACROSS BUCKETS (FULL WIDTH) ----
 st.subheader("📈 Default Trend Across Financial Stress Buckets")
