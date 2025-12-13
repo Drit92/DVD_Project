@@ -239,8 +239,7 @@ for col, (r, c) in demo_mapping.items():
 
     df_demo = df_demo.copy()
     df_demo["DefaultRate"] = (df_demo["DefaultRate"] * 100).round(2)
-    # riskiest first (descending)
-    df_demo = df_demo.sort_values("DefaultRate", ascending=False)
+    df_demo = df_demo.sort_values("DefaultRate", ascending=False)  # riskiest left
 
     fig_tmp = px.bar(
         df_demo,
@@ -311,51 +310,12 @@ st.markdown("---")
 
 
 # ============================================
-# 3. FINANCIAL STRESS – DEFAULT TREND
+# 3. FINANCIAL STRESS – BANDS + TREND
 # ============================================
 
 st.header("💰 Financial Stress – How Much Debt Is Too Much?")
 
-credit_default = get_agg("credit_default").copy()
-credit_default["DefaultRate"] = credit_default["DefaultRate"] * 100
-credit_default = credit_default.dropna(subset=["CREDIT_BIN"])
-
-credit_order = ["0-1x", "1-2x", "2-3x", "3-5x", "5x+"]
-credit_default["CREDIT_BIN"] = pd.Categorical(
-    credit_default["CREDIT_BIN"],
-    categories=credit_order,
-    ordered=True,
-)
-credit_default = credit_default.sort_values("CREDIT_BIN")
-
-fig_trend = px.line(
-    credit_default,
-    x="CREDIT_BIN",
-    y="DefaultRate",
-    markers=True,
-    title="Default Rate Across Credit / Income Buckets",
-    labels={"CREDIT_BIN": "Credit / income bucket", "DefaultRate": "Default rate (%)"},
-    color_discrete_sequence=["#dc3545"],
-)
-fig_trend.update_traces(line_shape="linear", marker=dict(size=8))
-fig_trend.update_yaxes(ticksuffix="%")
-fig_trend.update_layout(transition_duration=0)
-st.plotly_chart(fig_trend, width="stretch")
-
-st.markdown(
-    """
-**Insights:**
-- Default rate **rises steadily** as the loan amount grows relative to income, with a sharp jump beyond **3× income**.
-- A practical guardrail is to keep loans below **4× income** and EMIs below **about 25% of income** wherever possible.
-"""
-)
-st.markdown("---")
-
-
-# ============================================
-# 3B. FINANCIAL STRESS BANDS – DEFAULTERS ONLY
-# ============================================
-
+# ---- 3B. DEFAULTERS-ONLY BAND SHARES ----
 st.subheader("📊 Where Are Defaulters Concentrated by Stress Band?")
 
 credit_band_def = get_agg("defaulters_credit_band_share", required=False)
@@ -430,6 +390,56 @@ with col_fs2:
         )
         fig_ip.update_yaxes(ticksuffix="%")
         st.plotly_chart(fig_ip, width="stretch")
+
+# ---- 3C. LINE TREND AFTER THE THREE CHARTS ----
+st.subheader("📈 Default Trend Across Financial Stress Buckets")
+
+credit_default = get_agg("credit_default").copy()
+if credit_default.empty:
+    st.info("Credit / income default aggregate not available.")
+else:
+    credit_default = credit_default.dropna(subset=["CREDIT_BIN"])
+    credit_default["DefaultRate"] = credit_default["DefaultRate"] * 100
+
+    credit_order = ["0-1x", "1-2x", "2-3x", "3-5x", "5x+"]
+    credit_default["CREDIT_BIN"] = pd.Categorical(
+        credit_default["CREDIT_BIN"],
+        categories=credit_order,
+        ordered=True,
+    )
+    credit_default = credit_default.sort_values("CREDIT_BIN")
+
+    fig_trend = px.line(
+        credit_default,
+        x="CREDIT_BIN",
+        y="DefaultRate",
+        markers=True,
+        title="Default Trend Across Financial Stress Buckets",
+        labels={
+            "CREDIT_BIN": "Credit / Income Stress Group",
+            "DefaultRate": "Default Rate (%)",
+        },
+        color_discrete_sequence=["#dc3545"],
+    )
+    fig_trend.update_traces(line_shape="linear", marker=dict(size=8))
+    fig_trend.update_yaxes(ticksuffix="%")
+
+    col_line_l, col_line_r = st.columns([2, 1])
+
+    with col_line_l:
+        st.plotly_chart(fig_trend, width="stretch")
+
+    with col_line_r:
+        st.markdown(
+            """
+**Line‑chart insights:**
+
+- Default rate **rises steadily** as the loan amount grows relative to income, 
+  with a clear jump beyond **3× income**.
+- Keeping credit exposure below about **4× annual income** keeps default risk in a
+  more stable band; above that, the curve bends upward sharply.
+"""
+        )
 
 st.markdown("---")
 
