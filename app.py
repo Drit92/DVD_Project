@@ -499,4 +499,3 @@ if len(radar_cols) >= 3:
     **Insight:** The red shape (defaulters) bulges where debt burdens and refusals are higher and external scores weaker, while the green shape (non‑defaulters) shows lower leverage and stronger scores.
     """)
 
-st.caption("Dashboard built for non‑technical users: each chart answers a simple question about loan risk.")
