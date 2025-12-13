@@ -221,7 +221,9 @@ st.markdown("---")
 
 # === 6. EXTERNAL CREDIT SCORES ===
 st.header("⭐ External Credit Scores")
-col1, col2 = st.columns(2)
+
+# Bar chart on left + Insights on right
+col1, col2 = st.columns([2, 1])
 
 with col1:
     ext2_def = df.groupby('EXT2_Q')['TARGET'].mean() * 100
@@ -236,26 +238,34 @@ with col1:
     st.plotly_chart(fig_ext2, width='stretch')
 
 with col2:
-    fig_hist = px.histogram(
-        df, 
-        x='EXT_SOURCE_2', 
-        color='TARGET',
-        nbins=50,
-        marginal='violin',
-        title="EXT_SOURCE_2 Distribution by Default Status",
-        labels={'EXT_SOURCE_2': 'External Credit Score', 'count': 'Number of Applicants'},
-        color_discrete_map={0: '#28a745', 1: '#dc3545'}
-    )
-    fig_hist.update_traces(marker_line_width=1.5, marker_line_color='black')
-    fig_hist.update_layout(height=450, legend_title="Default Status")
-    st.plotly_chart(fig_hist, width='stretch')
+    st.markdown("""
+    **🔍 Insights:**
+    
+    **Q1 (lowest scores)**: 12% default  
+    **Q4 (highest)**: 3% default
+    
+    **Monotonic gradient**:  
+    Higher external scores = exponentially safer
+    
+    **Gold standard** predictor
+    """)
 
-st.markdown("""
-**🔍 Insights:**
-- **Q1 (lowest scores)**: 12% default vs **Q4 (highest)**: 3%
-- **Monotonic gradient**: Higher external scores = exponentially safer
-- External bureaus are **gold standard** predictor
-""")
+# FULL WIDTH HISTOGRAM BELOW
+st.markdown("---")
+fig_hist = px.histogram(
+    df, 
+    x='EXT_SOURCE_2', 
+    color='TARGET',
+    nbins=50,
+    marginal='violin',
+    title="EXT_SOURCE_2 Distribution by Default Status",
+    labels={'EXT_SOURCE_2': 'External Credit Score', 'count': 'Number of Applicants'},
+    color_discrete_map={0: '#28a745', 1: '#dc3545'}
+)
+fig_hist.update_traces(marker_line_width=1.5, marker_line_color='black')
+fig_hist.update_layout(height=500, legend_title="Default Status")
+st.plotly_chart(fig_hist, width='stretch')
+
 
 st.markdown("---")
 
