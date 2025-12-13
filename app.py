@@ -11,10 +11,14 @@ st.set_page_config(page_title="🏦 Home Credit Risk Dashboard", layout="wide")
 st.title("🏦 Home Credit Risk Dashboard")
 st.markdown("---")
 
-@st.cache_data
+
+@st.cache_data(show_spinner="🔄 Engineering features...")
 def load_data():
+    """Load + engineer in one cached function"""
     app_data, prev_data = load_raw_data()
-    return engineer_features(app_data, prev_data)
+    df = engineer_features(app_data, prev_data)
+    st.cache_data.clear()  # Clear other caches if needed
+    return df
 
 df = load_data()
 st.success(f"✅ Loaded {len(df):,} records | 🔴 Default Rate: {df['TARGET'].mean():.1%}")
