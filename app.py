@@ -79,7 +79,7 @@ def build_loan_kind(series_contract_type: pd.Series) -> pd.Series:
     type_map = {
         "Cash loans": "Personal loan",
         "Industrial loans": "Industrial loan",   # <- your industrial flag
-        # remove "Revolving loans" if you don't want that category
+        
     }
     return series_contract_type.map(type_map).fillna(series_contract_type)
 
