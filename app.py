@@ -409,7 +409,6 @@ st.markdown(
 
 Default risk increases significantly as financial stress increases, but risk peaks at **mid‑level stress** rather than at the extremes.
 
-**Final report narrative**
 
 - Borrowers with **medium‑high debt load (credit/income 3–5×)** show the highest default probability (≈31% of defaulters).  
 - EMI affordability risk is highest for **10–20% EMI borrowers (~47%)**, so moderately leveraged consumers can be riskier than heavily leveraged ones.  
