@@ -695,8 +695,9 @@ if radar_means.empty:
 else:
     radar_means = radar_means.copy()
     radar_means["TARGET"] = radar_means["TARGET"].astype(int)
-    radar_means = radar_means.set_index("TARGET").T  # rows=features, cols=TARGET
+    radar_means = radar_means.set_index("TARGET").T  # rows = features, cols = TARGET
 
+    # Min–max normalise each feature to [0, 1]
     radar_norm = radar_means.apply(
         lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9),
         axis=1,
@@ -712,22 +713,38 @@ else:
         dpi=100,
     )
 
+    # Non‑defaulters
     if 0 in radar_norm.columns:
         vals0 = radar_norm[0].tolist() + radar_norm[0].tolist()[:1]
-        ax_radar.plot(angles, vals0, linewidth=1.3, label="Non-Defaulters (0)", color="green")
+        ax_radar.plot(
+            angles, vals0, linewidth=1.3, label="Non-Defaulters (0)", color="green"
+        )
         ax_radar.fill(angles, vals0, alpha=0.22, color="green")
 
+    # Defaulters
     if 1 in radar_norm.columns:
         vals1 = radar_norm[1].tolist() + radar_norm[1].tolist()[:1]
-        ax_radar.plot(angles, vals1, linewidth=1.3, label="Defaulters (1)", color="red")
+        ax_radar.plot(
+            angles, vals1, linewidth=1.3, label="Defaulters (1)", color="red"
+        )
         ax_radar.fill(angles, vals1, alpha=0.22, color="red")
 
+    # Axis labels
     ax_radar.set_xticks(angles[:-1])
-    ax_radar.set_xticklabels(labels, fontsize=7)  # slightly smaller
+    ax_radar.set_xticklabels(labels, fontsize=7)
+
+    # Nudge EXT_SOURCE_2 and CREDIT_INCOME_RATIO labels outward
+    for lbl in ax_radar.get_xticklabels():
+        txt = lbl.get_text()
+        if txt in ["EXT_SOURCE_2", "CREDIT_INCOME_RATIO"]:
+            y0 = lbl.get_position()[1]
+            lbl.set_verticalalignment("bottom")
+            lbl.set_y(y0 + 0.08)  # move slightly away from the plot
+
     ax_radar.set_ylim(0, 1)
     ax_radar.set_yticklabels([])
 
-    # more padding so labels sit further from the circle and from each other
+    # Inner padding so labels and legend do not clash
     fig_radar.subplots_adjust(left=0.25, right=0.75, top=0.78, bottom=0.25)
 
     ax_radar.set_title("Risk Profile Comparison – Radar Chart", pad=12, fontsize=11)
