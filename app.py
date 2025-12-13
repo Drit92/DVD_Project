@@ -645,15 +645,15 @@ st.header("🎯 Combined Risk Score – One Number That Combines All Risk Flags"
 
 st.markdown(
     """
-Combined Risk Score adds three components for each applicant:
+The Combined Risk Score brings three ideas into a single, easy number for each applicant:
 
-- **Financial stress** – how large the loan and EMI are relative to income.  
-- **Behaviour** – past refusals and how often the person has applied before.  
-- **External score bucket** – quality of their external / bureau risk score.
+- **Financial stress** – how big the loan and EMI are relative to income.  
+- **Behaviour** – past refusals and how many times the customer has applied before.  
+- **External risk** – which bucket their external / bureau score falls into.
 
-In words:  
-**Combined Risk Score = Financial Stress Score + Behaviour Score + External Score Component**.  
-Higher scores mean **more red flags** across these areas.
+Put simply:  
+**Combined Risk Score = Financial Stress Component + Behaviour Component + External Score Component**.  
+Higher scores mean **more red flags** across these dimensions, and therefore higher default risk.
 """
 )
 
@@ -663,24 +663,51 @@ risk_def["DefaultRate"] = risk_def["DefaultRate"] * 100
 risk_def = risk_def.sort_values("RISK_SCORE")
 
 fig_risk = px.bar(
-    x=risk_def["RISK_SCORE"].astype(str),
-    y=risk_def["DefaultRate"],
+    risk_def,
+    x="RISK_SCORE",
+    y="DefaultRate",
     title="Default Rate by Combined Risk Score",
     labels={
-        "x": "Combined risk score (0 = safest, higher = riskier)",
-        "y": "Default rate (%)",
+        "RISK_SCORE": "Combined risk score (0 = safest, 9 = riskiest)",
+        "DefaultRate": "Default rate (%)",
     },
-    color_discrete_sequence=["#fd7e14"],
 )
+
+# Show all x labels 0–9
+fig_risk.update_xaxes(
+    tickmode="array",
+    tickvals=list(range(10)),
+    ticktext=[str(i) for i in range(10)],
+)
+
+# Gradient palette: green → yellow → red for low → medium → high risk
+fig_risk.update_traces(
+    marker=dict(
+        color=risk_def["RISK_SCORE"],
+        colorscale=[
+            [0.0, "rgb(0,160,0)"],     # low risk
+            [0.5, "rgb(255,210,0)"],   # medium risk
+            [1.0, "rgb(200,0,0)"],     # high risk
+        ],
+        colorbar=dict(
+            title="Risk level",
+            tickvals=[0, 4, 9],
+            ticktext=["Low", "Medium", "High"],
+        ),
+    ),
+)
+
 fig_risk.update_yaxes(ticksuffix="%")
-fig_risk.update_layout(transition_duration=0)
-st.plotly_chart(fig_risk, width="stretch")
+fig_risk.update_layout(showlegend=False, transition_duration=0)
+
+st.plotly_chart(fig_risk, use_container_width=True)
 
 st.markdown(
     """
 **Insight:** Low scores capture the **safest borrowers**, while high scores group together the **riskiest applicants**, so this single score can drive cut‑offs, pricing bands and watchlists.
 """
 )
+
 st.markdown("---")
 
 # ============================================
