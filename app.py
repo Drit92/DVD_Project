@@ -112,6 +112,46 @@ st.markdown("""
 
 st.markdown("---")
 
+# === 2A. AGE DISTRIBUTION – DEFAULTERS ONLY ===
+st.header("🎂 Age Profile of Defaulters")
+
+# Recreate defaulter-only cleaned dataset as in Colab
+df_def = df[df['TARGET'] == 1].copy()
+
+# AGE_YEARS already engineered; clip to a reasonable range
+df_def['AGE_YEARS'] = df_def['AGE_YEARS'].clip(lower=18, upper=80)
+
+fig_age, ax_age = plt.subplots(figsize=(8, 4))
+
+sns.histplot(
+    data=df_def,
+    x='AGE_YEARS',
+    kde=True,
+    bins=40,
+    stat="density",
+    color="#E57373",
+    alpha=0.65,
+    ax=ax_age
+)
+
+ax_age.set_title("Age Distribution of Defaulters", fontsize=13)
+ax_age.set_xlabel("Age in years")
+ax_age.set_ylabel("Density")
+ax_age.grid(True, axis="y", linestyle="--", alpha=0.3)
+
+st.pyplot(fig_age, width="stretch")
+
+st.markdown("""
+**Story:**
+- Most defaulters fall between **about 28 and 45 years old**.
+- Default risk tapers off for older customers, who tend to be more financially stable.
+""")
+
+st.markdown("---")
+
+
+
+
 # === 3. FINANCIAL STRESS + TREND ===
 st.header("💰 Financial Stress – How Much Debt Is Too Much?")
 
@@ -353,8 +393,8 @@ st.markdown("""
 
 st.markdown("---")
 
-# === 8. RADAR CHART ===
-st.header("📈 Overall Risk Profile – Side‑by‑Side View")
+# === 8. RADAR CHART – COLAB STYLE (Matplotlib) ===
+st.header("📈 Risk Profile Comparison – Radar Chart")
 
 radar_cols = [
     'CREDIT_INCOME_RATIO',
@@ -362,62 +402,64 @@ radar_cols = [
     'FLAG_EVER_REFUSED',
     'EXT_SOURCE_2',
     'AGE_YEARS',
-    'INCOME_PER_PERSON'
+    'AMT_INCOME_TOTAL'
 ]
+# Keep only columns that actually exist
 radar_cols = [c for c in radar_cols if c in df.columns]
 
 if len(radar_cols) >= 3:
-    radar_raw = df.groupby('TARGET')[radar_cols].mean()
-    radar_norm = pd.DataFrame(index=radar_cols)
-    for col in radar_cols:
-        col_min = radar_raw[col].min()
-        col_max = radar_raw[col].max()
-        radar_norm.loc[col, 0] = (radar_raw.loc[0, col] - col_min) / (col_max - col_min + 1e-9)
-        radar_norm.loc[col, 1] = (radar_raw.loc[1, col] - col_min) / (col_max - col_min + 1e-9)
-    radar_norm = radar_norm.astype(float)
-
-    fig_radar = go.Figure()
-    vals0 = radar_norm[0].tolist() + radar_norm[0].tolist()[:1]
-    vals1 = radar_norm[1].tolist() + radar_norm[1].tolist()[:1]
-
-    fig_radar.add_trace(go.Scatterpolar(
-        r=vals0,
-        theta=[c.replace('_', ' ').title() for c in radar_cols] + [radar_cols[0].replace('_', ' ').title()],
-        fill='toself',
-        name='Good borrowers (0)',
-        line_color='green',
-        line=dict(width=4),
-        fillcolor='rgba(0,255,0,0.2)'
-    ))
-    fig_radar.add_trace(go.Scatterpolar(
-        r=vals1,
-        theta=[c.replace('_', ' ').title() for c in radar_cols] + [radar_cols[0].replace('_', ' ').title()],
-        fill='toself',
-        name='Defaulters (1)',
-        line_color='red',
-        line=dict(width=4),
-        fillcolor='rgba(255,0,0,0.2)'
-    ))
-
-    fig_radar.update_layout(
-        title="Normalized Risk Profile – Good Borrowers vs Defaulters",
-        polar=dict(
-            radialaxis=dict(
-                visible=True,
-                range=[0, 1],
-                tickvals=[0, 0.25, 0.5, 0.75, 1.0]
-            )
-        ),
-        showlegend=True,
-        height=650
+    # Match Colab: group by TARGET, take means, then transpose
+    radar_data = (
+        df.groupby('TARGET')[radar_cols]
+        .mean()
+        .T
     )
-    st.plotly_chart(fig_radar, width='stretch')
+
+    # Same normalization as Colab (row-wise 0–1)
+    radar_norm = radar_data.apply(
+        lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9),
+        axis=1
+    )
+
+    labels = radar_norm.index.tolist()
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
+    angles += angles[:1]  # close loop
+
+    fig_radar, ax_radar = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
+
+    # Non-defaulters (TARGET=0)
+    if 0 in radar_norm.columns:
+        vals0 = radar_norm[0].tolist()
+        vals0 += vals0[:1]
+        ax_radar.plot(angles, vals0, linewidth=2, label='Non-Defaulters (0)', color='green')
+        ax_radar.fill(angles, vals0, alpha=0.25, color='green')
+
+    # Defaulters (TARGET=1)
+    if 1 in radar_norm.columns:
+        vals1 = radar_norm[1].tolist()
+        vals1 += vals1[:1]
+        ax_radar.plot(angles, vals1, linewidth=2, label='Defaulters (1)', color='red')
+        ax_radar.fill(angles, vals1, alpha=0.25, color='red')
+
+    ax_radar.set_xticks(angles[:-1])
+    ax_radar.set_xticklabels(labels)
+    ax_radar.set_ylim(0, 1)
+    ax_radar.set_yticklabels([])
+
+    ax_radar.set_title("Risk Profile Comparison – Radar Chart", pad=30)
+    ax_radar.legend(bbox_to_anchor=(1.25, 1.1))
+    plt.tight_layout()
+
+    st.pyplot(fig_radar, width="stretch")
 
     st.markdown("""
     **Story:**
-    - Defaulters carry **higher debt loads**, more refusals and weaker external scores.
-    - Good borrowers are **older, better‑scored and less leveraged**.
+    - The **red shape (defaulters)** bulges where debt burden and refusals are higher and external scores weaker.
+    - The **green shape (non‑defaulters)** is smaller on stress features and larger on income and external scores.
     """)
+else:
+    st.info("Not enough radar features available to draw the chart.")
+
 
 st.markdown("---")
 st.caption("Dashboard built for non‑technical users: each chart answers a simple question about loan risk.")
