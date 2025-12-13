@@ -530,5 +530,59 @@ st.markdown(
 st.markdown("---")
 
 
+# === 8. RADAR CHART – COLAB STYLE, SMALLER ===
+st.header("📈 Risk Profile Comparison – Radar Chart")
+
+radar_cols = [
+    "CREDIT_INCOME_RATIO",
+    "ANNUITY_INCOME_RATIO",
+    "FLAG_EVER_REFUSED",
+    "EXT_SOURCE_2",
+    "AGE_YEARS",
+    "AMT_INCOME_TOTAL",
+]
+radar_cols = [c for c in df.columns if c in radar_cols]
+
+if len(radar_cols) >= 3:
+    radar_data = df.groupby("TARGET")[radar_cols].mean().T.astype("float32")
+    radar_norm = radar_data.apply(
+        lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9), axis=1
+    )
+
+    labels = radar_norm.index.tolist()
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
+    angles += angles[:1]
+
+    fig_radar, ax_radar = plt.subplots(
+        figsize=(3.8, 3.8), subplot_kw=dict(polar=True)
+    )
+
+    if 0 in radar_norm.columns:
+        vals0 = radar_norm[0].tolist() + radar_norm[0].tolist()[:1]
+        ax_radar.plot(angles, vals0, linewidth=2, label="Non-Defaulters (0)", color="green")
+        ax_radar.fill(angles, vals0, alpha=0.25, color="green")
+
+    if 1 in radar_norm.columns:
+        vals1 = radar_norm[1].tolist() + radar_norm[1].tolist()[:1]
+        ax_radar.plot(angles, vals1, linewidth=2, label="Defaulters (1)", color="red")
+        ax_radar.fill(angles, vals1, alpha=0.25, color="red")
+
+    ax_radar.set_xticks(angles[:-1])
+    ax_radar.set_xticklabels(labels, fontsize=6)
+    ax_radar.set_ylim(0, 1)
+    ax_radar.set_yticklabels([])
+
+    ax_radar.set_title("Risk Profile Comparison – Radar Chart", pad=12, fontsize=11)
+    ax_radar.legend(bbox_to_anchor=(1.05, 1.0), borderaxespad=0.0, fontsize=7)
+    plt.tight_layout(pad=0.8)
+
+    st.pyplot(fig_radar, width="content")
+
+    st.markdown(
+        """
+    **Insight:** The red shape (defaulters) bulges where debt burdens and refusals are higher and external scores weaker, while the green shape (non‑defaulters) shows lower leverage and stronger scores.
+    """
+        )
+
 
 
