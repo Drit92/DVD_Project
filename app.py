@@ -171,38 +171,46 @@ with col1:
         st.plotly_chart(fig_gender_pie, width="stretch")
 
 with col2:
-    st.subheader("Applicant Age Distribution (Defaulters Approx.)")
-    age_hist = get_agg("age_defaulters_hist", required=False)
+    st.subheader("Applicant Age Distribution")
+    age_hist = get_agg("age_distribution", required=False)
     if age_hist.empty:
-        st.info("Age histogram aggregate not available.")
+        st.info("age_distribution.csv not available in aggregates ZIP.")
     else:
-        age_hist = age_hist.copy()
-        age_hist["bin_mid"] = (age_hist["bin_left"] + age_hist["bin_right"]) / 2
-
-        # Base histogram (binned bar chart)
         fig_age_all = px.bar(
             age_hist,
-            x="bin_mid",
-            y="count",
+            x="Age_Years",
+            y="Count",
             labels={
-                "bin_mid": "Age (years)",
-                "count": "Number of defaulters (binned)",
+                "Age_Years": "Age (years)",
+                "Count": "Number of Applicants",
             },
-            title="Distribution of Loan Applicant Age (Defaulters Approx.)",
+            title="Distribution of Loan Applicant Age",
             color_discrete_sequence=["#4C72B0"],
+            text=age_hist["Count"].astype(int),
         )
-        fig_age_all.update_traces(marker_line_width=1.2, marker_line_color="black")
-
-        # Smooth trendline using the same binned data
+        
+        fig_age_all.update_traces(
+            textposition="outside",
+            textfont=dict(size=10),
+            marker_line_width=1.2, 
+            marker_line_color="black"
+        )
+        
         fig_age_all.add_scatter(
-            x=age_hist["bin_mid"],
-            y=age_hist["count"],
+            x=age_hist["Age_Years"],
+            y=age_hist["Count"],
             mode="lines",
-            name="Smoothed trend",
-            line=dict(color="crimson", width=2, shape="spline"),
+            line=dict(color="crimson", width=2.5, shape="spline"),
+            showlegend=False,
         )
 
-        fig_age_all.update_layout(height=260, transition_duration=0, showlegend=False)
+        fig_age_all.update_layout(
+            height=260, 
+            transition_duration=0,
+            showlegend=False,
+            yaxis_title="Number of Applicants",
+            xaxis_title="Age (years)"
+        )
         st.plotly_chart(fig_age_all, width="stretch")
 
 st.markdown(
