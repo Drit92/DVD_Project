@@ -434,7 +434,7 @@ with col_fs3:
 # Second row: full-width insight text, spans entire page under the three charts
 st.markdown(
     """
-    **Insights**
+    **Insights:**
 
     Default risk increases significantly as financial stress increases, but risk peaks at **mid‑level stress** rather than at the extremes.
 
@@ -483,7 +483,7 @@ else:
 
        
         st.markdown("""
-            **Insights**
+            **Insights:**
             - Default risk climbs from **low debt (0-1x income)** to **medium debt (2-3x income)**, hitting **8-9%**.
             - **Surprise**: Very high debt (5x+ income) is actually **safer** than medium debt.
             - **Why?** Moderately stressed borrowers are riskier than both safe and desperate ones.
@@ -662,7 +662,7 @@ if not edu_ext.empty:
         st.plotly_chart(fig_heat_edu, use_container_width=True)
 
 st.markdown("""
-**Key Insights (Simple Terms):**
+**Insights:**
 - **High debt (3-5x income) + past rejection = 14-18% will default** (vs 7-9% for clean records)
 - **High school education + worst credit score = 15%+ will default** (vs 3-4% for college grads + best scores)
 - **Bad + bad = MUCH worse** – reject when multiple red flags appear together
@@ -704,7 +704,7 @@ with col1:
 with col2:
     st.markdown(
         """
-        **Key Insights:**
+        **Insights:**
         - **Lowest quartile (Q1)** shows significantly higher default rates than **highest quartile (Q4)**.
         - Default probability decreases steadily as external scores improve, making this a powerful screening tool.
         """
