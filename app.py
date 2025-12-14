@@ -320,7 +320,7 @@ else:
         color_discrete_sequence=["#E57373"],
     )
     fig_age_def.update_traces(marker_line_width=1.2, marker_line_color="black")
-    fig_age_def.update_layout(height=260, transition_duration=0)
+    fig_age_def.update_layout(height=400, transition_duration=0)
     st.plotly_chart(fig_age_def, width="stretch")
 
 st.markdown(
