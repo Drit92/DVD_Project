@@ -434,7 +434,7 @@ with col_fs3:
 # Second row: full-width insight text, spans entire page under the three charts
 st.markdown(
     """
-    **Key takeaway**
+    **Insights**
 
     Default risk increases significantly as financial stress increases, but risk peaks at **mid‑level stress** rather than at the extremes.
 
@@ -481,14 +481,7 @@ else:
         fig_trend.update_yaxes(ticksuffix="%")
         st.plotly_chart(fig_trend, width="stretch")
 
-        st.markdown(
-            """
-            The default rate increases as the credit/income ratio rises from **0–1×** to **2–3×**, peaking around **8.5–9%**.
-            After **2–3×**, the default rate declines, indicating lower default risk for the highest credit/income bands.
-
-            The curve peaks in the **middle of the stress range (2–3×)** and then falls, suggesting a **non‑linear relationship** where borrowers with moderate financial stress can be riskier than those at the very low or very high ends.
-            """
-        )
+       
         st.markdown("""
             **Simple Explanation:**
             - Default risk climbs from **low debt (0-1x income)** to **medium debt (2-3x income)**, hitting **8-9%**.
