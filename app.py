@@ -617,6 +617,55 @@ st.markdown(
 )
 st.markdown("---")
 
+# ============================================
+# 🔥5.B RISK INTERACTION HEATMAPS 
+# ============================================
+
+st.header("🔥 Risk Interactions – Combined Effects")
+
+col1, col2 = st.columns(2)
+
+# Heatmap 1: CREDIT_BIN × FLAG_EVER_REFUSED (Cell 12 from Colab)
+credit_refusal = get_agg("credit_refusal_heatmap", required=False)
+if not credit_refusal.empty:
+    with col1:
+        # Pivot for heatmap: rows=CREDIT_BIN, columns=refusal status
+        pivot_credit = credit_refusal.set_index("CREDIT_BIN")[["No Refusal", "Had Refusal"]]
+        fig_heat_credit = px.imshow(
+            pivot_credit,
+            color_continuous_scale="Reds",
+            title="Credit Stress × Past Refusal<br><sup>Had refusal = 2-3x higher risk in all bands</sup>",
+            aspect="auto",
+            labels=dict(color="Default Rate (%)")
+        )
+        fig_heat_credit.update_layout(height=350, margin=dict(t=80, l=20, r=20))
+        st.plotly_chart(fig_heat_credit, use_container_width=True)
+
+# Heatmap 2: NAME_EDUCATION_TYPE × EXT2_Q (Cell 13 from Colab)
+edu_ext = get_agg("education_ext_heatmap", required=False)
+if not edu_ext.empty:
+    with col2:
+        # Pivot for heatmap: rows=education, columns=EXT quartiles
+        pivot_edu = edu_ext.set_index("NAME_EDUCATION_TYPE")[["Q1 (low)", "Q2", "Q3", "Q4 (high)"]]
+        fig_heat_edu = px.imshow(
+            pivot_edu,
+            color_continuous_scale="Blues",
+            title="Education × External Score<br><sup>Low education + Q1 = 15%+ default risk</sup>",
+            aspect="auto",
+            labels=dict(color="Default Rate (%)")
+        )
+        fig_heat_edu.update_layout(height=350, margin=dict(t=80, l=20, r=20))
+        st.plotly_chart(fig_heat_edu, use_container_width=True)
+
+st.markdown("""
+**Key Insights (from Colab):**
+- **Credit 3-5x + refusal = 14-18% default** (vs 7-9% clean history across all bands)
+- **Secondary education + Q1 score = 15%+ default** (vs 3-4% for higher education + Q4)
+- **Interactions multiply risk** – reject combinations, not just individual flags
+""")
+st.markdown("---")
+
+
 
 # ============================================
 # 6. EXTERNAL CREDIT SCORES – QUARTILES
