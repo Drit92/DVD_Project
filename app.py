@@ -883,7 +883,6 @@ st.markdown(
 """
 **Insight:** The red shape (defaulters) bulges where debt burdens and refusals are higher and external scores weaker, while the green shape (non‑defaulters) shows lower leverage and stronger scores.
 
-**Hover any point** to see exact normalized values for each feature!
 """
 )
 
