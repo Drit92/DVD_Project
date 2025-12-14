@@ -320,8 +320,19 @@ else:
         color_discrete_sequence=["#E57373"],
     )
     fig_age_def.update_traces(marker_line_width=1.2, marker_line_color="black")
-    fig_age_def.update_layout(height=400, transition_duration=0)
+
+    # Smooth translucent trendline
+    fig_age_def.add_scatter(
+        x=age_hist["bin_mid"],
+        y=age_hist["count"],
+        mode="lines",
+        name="Smoothed trend",
+        line=dict(color="rgba(139,0,0,0.7)", width=2, shape="spline"),
+    )
+
+    fig_age_def.update_layout(height=400, transition_duration=0, showlegend=False)
     st.plotly_chart(fig_age_def, width="stretch")
+
 
 st.markdown(
     """
