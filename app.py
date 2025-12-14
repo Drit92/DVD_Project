@@ -215,7 +215,6 @@ st.markdown(
 )
 st.markdown("---")
 
-
 # ============================================
 # 2. DEMOGRAPHIC SEGMENTS – RISKIEST LEFT
 # ============================================
@@ -225,8 +224,8 @@ st.header("👥 Demographic Segments – Who Is Riskier?")
 fig_dem = make_subplots(
     rows=2,
     cols=2,
-    horizontal_spacing=0.16, # wider horizontal gap
-    vertical_spacing=0.32, # wider vertical gap
+    horizontal_spacing=0.16,
+    vertical_spacing=0.32,
     subplot_titles=(
         "Education level",
         "Type of income",
@@ -270,21 +269,25 @@ for col, (r, c) in demo_mapping.items():
         },
     )
     fig_tmp.update_layout(
-        margin=dict(t=30, b=50, l=40, r=40), # tighter inner margins
+        margin=dict(t=30, b=50, l=40, r=40),
         xaxis=dict(tickangle=-35),
         coloraxis_showscale=False,
     )
-    fig_tmp.update_traces(text=df_demo["DefaultRate"], textposition="outside", textfont=dict(size=11, color="white"))
-
+    # ✅ SHOW VALUES ON BARS
+    fig_tmp.update_traces(
+        text=df_demo["DefaultRate"], 
+        textposition="outside", 
+        textfont=dict(size=11, color="white")
+    )
 
     for trace in fig_tmp.data:
         fig_dem.add_trace(trace, row=r, col=c)
 
 fig_dem.update_layout(
-    height=720, # a bit taller
+    height=720,
     showlegend=False,
     title="Default Rate by Demographic Group (riskiest categories on the left)",
-    margin=dict(l=60, r=60, t=90, b=60), # bigger outer margins
+    margin=dict(l=60, r=60, t=90, b=60),
     transition_duration=0,
 )
 
