@@ -174,31 +174,50 @@ with col1:
 
 with col2:
     st.subheader("Applicant Age Distribution")
-    
-    # Direct ZIP access - NO get_agg() needed
     try:
         with zipfile.ZipFile(ZIP_PATH, "r") as zf:
             if "agg_age_distribution.csv" in zf.namelist():
                 age_hist = pd.read_csv(zf.open("agg_age_distribution.csv"))
-                st.plotly_chart(px.bar(
-                    age_hist, x="Age_Years", y="Count",
-                    labels={"Age_Years": "Age (years)", "Count": "Number of Applicants"},
+
+                # Bar layer (match seaborn hist: light blue, semi‑transparent)
+                fig_age_all = px.bar(
+                    age_hist,
+                    x="Age_Years",
+                    y="Count",
+                    labels={
+                        "Age_Years": "Age (Years)",
+                        "Count": "Number of Applicants",
+                    },
                     title="Distribution of Loan Applicant Age",
-                    color_discrete_sequence=["#4C72B0"],
-                    text=age_hist["Count"].astype(int)
-                ).update_traces(
-                    textposition="outside", textfont=dict(size=10),
-                    marker_line_width=1.2, marker_line_color="black"
-                ).add_scatter(
-                    x=age_hist["Age_Years"], y=age_hist["Count"],
-                    mode="lines", line=dict(color="crimson", width=2.5, shape="spline"),
-                    showlegend=False
-                ).update_layout(
-                    height=260, transition_duration=0, showlegend=False,
-                    yaxis_title="Number of Applicants", xaxis_title="Age (years)"
-                ), width="stretch")
+                )
+                fig_age_all.update_traces(
+                    marker_color="#4C72B0",   # seaborn-style blue [web:20]
+                    opacity=0.35,
+                    marker_line_width=0,
+                    text=None,
+                )
+
+                # Smooth line layer (same blue, fully opaque)
+                fig_age_all.add_scatter(
+                    x=age_hist["Age_Years"],
+                    y=age_hist["Count"],
+                    mode="lines",
+                    line=dict(color="#4C72B0", width=2.5, shape="spline"),
+                    showlegend=False,
+                )
+
+                fig_age_all.update_layout(
+                    height=260,
+                    transition_duration=0,
+                    showlegend=False,
+                    yaxis_title="Number of Applicants",
+                    xaxis_title="Age (Years)",
+                    margin=dict(t=60, l=40, r=10, b=40),
+                    plot_bgcolor="white",
+                )
+                st.plotly_chart(fig_age_all, use_container_width=True)
             else:
-                st.info("agg_age_distribution.csv not in ZIP")
+                st.info("agg_age_distribution.csv not in ZIP.")
     except Exception as e:
         st.info(f"Age data load error: {str(e)}")
 
