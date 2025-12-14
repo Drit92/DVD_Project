@@ -483,7 +483,7 @@ else:
 
        
         st.markdown("""
-            **Simple Explanation:**
+            **Insights**
             - Default risk climbs from **low debt (0-1x income)** to **medium debt (2-3x income)**, hitting **8-9%**.
             - **Surprise**: Very high debt (5x+ income) is actually **safer** than medium debt.
             - **Why?** Moderately stressed borrowers are riskier than both safe and desperate ones.
