@@ -174,7 +174,9 @@ with col1:
 
 with col2:
     st.subheader("Applicant Age Distribution")
-    age_hist = get_agg("age_distribution", required=False)
+    # Direct access - works since ZIP loads fine
+    age_hist = aggs.get("agg_age_distribution.csv", pd.DataFrame())
+    
     if age_hist.empty:
         st.info("age_distribution.csv not available in aggregates ZIP.")
     else:
@@ -214,6 +216,7 @@ with col2:
             xaxis_title="Age (years)"
         )
         st.plotly_chart(fig_age_all, width="stretch")
+
 
 st.markdown(
     """
