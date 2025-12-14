@@ -114,35 +114,44 @@ with col1:
 
 with col2:
     st.subheader("Applicant Age Distribution")
-    age_hist = get_agg("age_defaulters_hist", required=False)  # ← Use existing file
-    if age_hist.empty:
-        st.info("Age histogram aggregate not available.")
+    age_hist_all = get_agg("age_all_applicants_hist", required=False)
+    if age_hist_all.empty:
+        st.info("Age histogram not available.")
     else:
-        age_hist = age_hist.copy()
-        age_hist["bin_mid"] = (age_hist["bin_left"] + age_hist["bin_right"]) / 2
-
-        # Seaborn-style histogram + smooth KDE (20 bins effect)
-        fig_age_all = px.bar(
-            age_hist, x="bin_mid", y="count",
+        # EXACT seaborn replica: bars + smooth KDE curve
+        fig_age = px.bar(
+            age_hist_all, 
+            x="bin_mid", 
+            y="count",
             labels={"bin_mid": "Age (Years)", "count": "Number of Applicants"},
             title="Distribution of Loan Applicant Age",
-            color_discrete_sequence=["steelblue"]  # Coolwarm blue
-        )
-        fig_age_all.update_traces(marker_line_width=1.5, marker_line_color="darkblue")
-        
-        # Smooth KDE curve (warm orange like seaborn)
-        fig_age_all.add_scatter(
-            x=age_hist["bin_mid"], y=age_hist["count"],
-            mode="lines", name="Smooth trend",
-            line=dict(color="#E69F00", width=4, shape="spline")  # Coolwarm orange
+            color_discrete_sequence=["#1f77b4"]  # Seaborn blue
         )
         
-        fig_age_all.update_layout(
-            height=280, showlegend=False, 
+        # Dark borders like seaborn
+        fig_age.update_traces(
+            marker_line_width=1.2, 
+            marker_line_color="#1f77b4"
+        )
+        
+        # Smooth KDE curve (coolwarm orange)
+        fig_age.add_scatter(
+            x=age_hist_all["bin_mid"],
+            y=age_hist_all["count"],
+            mode="lines",
+            line=dict(color="#ff7f0e", width=3, shape="spline"),  # Coolwarm orange
+            name="Smooth trend",
+            showlegend=False
+        )
+        
+        fig_age.update_layout(
+            height=280, 
+            showlegend=False,
             font=dict(size=11),
             transition_duration=0
         )
-        st.plotly_chart(fig_age_all, use_container_width=True)
+        st.plotly_chart(fig_age, use_container_width=True)
+True)
 
 
 st.markdown(
