@@ -178,6 +178,8 @@ with col2:
     else:
         age_hist = age_hist.copy()
         age_hist["bin_mid"] = (age_hist["bin_left"] + age_hist["bin_right"]) / 2
+
+        # Base histogram (binned bar chart)
         fig_age_all = px.bar(
             age_hist,
             x="bin_mid",
@@ -190,8 +192,19 @@ with col2:
             color_discrete_sequence=["#4C72B0"],
         )
         fig_age_all.update_traces(marker_line_width=1.2, marker_line_color="black")
-        fig_age_all.update_layout(height=260, transition_duration=0)
+
+        # Smooth trendline using the same binned data
+        fig_age_all.add_scatter(
+            x=age_hist["bin_mid"],
+            y=age_hist["count"],
+            mode="lines",
+            name="Smoothed trend",
+            line=dict(color="crimson", width=2, shape="spline"),
+        )
+
+        fig_age_all.update_layout(height=260, transition_duration=0, showlegend=False)
         st.plotly_chart(fig_age_all, width="stretch")
+
 
 st.markdown(
     """
