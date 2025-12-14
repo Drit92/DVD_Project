@@ -11,6 +11,17 @@ import matplotlib.pyplot as plt
 import streamlit as st
 
 
+
+#---------delete--
+# DEBUG: Check what's actually loaded
+st.write("**DEBUG: Available agg files in ZIP:**")
+available_files = [name for name in aggs.keys() if name.startswith('agg_')]
+st.write(available_files)
+st.write(f"Looking for: agg_age_distribution.csv")
+st.write(f"Is it there? { 'agg_age_distribution.csv' in available_files }")
+
+#---------
+
 # ============================================
 # STREAMLIT CONFIG
 # ============================================
