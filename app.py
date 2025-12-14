@@ -645,15 +645,13 @@ st.header("🎯 Combined Risk Score – One Number That Combines All Risk Flags"
 
 st.markdown(
     """
-The Combined Risk Score brings three ideas into a single, easy number for each applicant:
+The Combined Risk Score brings three ideas into a single number:
 
-- **Financial stress** – how big the loan and EMI are relative to income.  
-- **Behaviour** – past refusals and how many times the customer has applied before.  
-- **External risk** – which bucket their external / bureau score falls into.
+- **Financial stress** – loan and EMI vs income.  
+- **Behaviour** – past refusals and application count.  
+- **External risk** – external / bureau score bucket.
 
-Put simply:  
-**Combined Risk Score = Financial Stress Component + Behaviour Component + External Score Component**.  
-Higher scores mean **more red flags** across these dimensions, and therefore higher default risk.
+Higher scores mean **more red flags** and higher default risk.
 """
 )
 
@@ -661,6 +659,17 @@ risk_def = get_agg("risk_score_default")
 risk_def = risk_def.copy()
 risk_def["DefaultRate"] = risk_def["DefaultRate"] * 100
 risk_def = risk_def.sort_values("RISK_SCORE")
+
+# Classify 0–9 into bands
+def band(score: int) -> str:
+    if score <= 3:
+        return "Safe (Low risk)"
+    elif score <= 6:
+        return "Medium risk"
+    else:
+        return "High risk"
+
+risk_def["RiskBand"] = risk_def["RISK_SCORE"].apply(band)
 
 fig_risk = px.bar(
     risk_def,
@@ -680,14 +689,14 @@ fig_risk.update_xaxes(
     ticktext=[str(i) for i in range(10)],
 )
 
-# Gradient palette: green → yellow → red for low → medium → high risk
+# Gradient palette: green → yellow → red
 fig_risk.update_traces(
     marker=dict(
         color=risk_def["RISK_SCORE"],
         colorscale=[
-            [0.0, "rgb(0,160,0)"],     # low risk
-            [0.5, "rgb(255,210,0)"],   # medium risk
-            [1.0, "rgb(200,0,0)"],     # high risk
+            [0.0, "rgb(0,160,0)"],
+            [0.5, "rgb(255,210,0)"],
+            [1.0, "rgb(200,0,0)"],
         ],
         colorbar=dict(
             title="Risk level",
@@ -695,6 +704,13 @@ fig_risk.update_traces(
             ticktext=["Low", "Medium", "High"],
         ),
     ),
+    # Custom hover text: band + score + default rate
+    hovertemplate=(
+        "Risk band: %{customdata[0]}<br>"
+        "Score: %{x}<br>"
+        "Default rate: %{y:.2f}%<extra></extra>"
+    ),
+    customdata=risk_def[["RiskBand"]].to_numpy(),
 )
 
 fig_risk.update_yaxes(ticksuffix="%")
@@ -707,7 +723,6 @@ st.markdown(
 **Insight:** Low scores capture the **safest borrowers**, while high scores group together the **riskiest applicants**, so this single score can drive cut‑offs, pricing bands and watchlists.
 """
 )
-
 st.markdown("---")
 
 # ============================================
