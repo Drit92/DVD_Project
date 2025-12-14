@@ -113,14 +113,32 @@ with col1:
     st.plotly_chart(fig_donut, width="stretch")
 
 with col2:
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Total Applicantions", f"{total_applicants:,}")
-    c2.metric(
-        "Total Defaulters",
-        f"{total_defaulters:,}",
-        f"{default_rate_overall:.1%}",
-    )
-    c3.metric("Total Good Borrowers", f"{total_good:,}")
+    st.subheader("Applicant Age Distribution (ALL)")
+    age_hist_all = get_agg("age_all_applicants_hist", required=False)
+    if age_hist_all.empty:
+        st.info("All-applicants age histogram not available.")
+    else:
+        age_hist_all = age_hist_all.copy()
+        age_hist_all["bin_mid"] = (age_hist_all["bin_left"] + age_hist_all["bin_right"]) / 2
+
+        # Histogram + KDE-style smooth line (like seaborn)
+        fig_age_all = px.bar(
+            age_hist_all, x="bin_mid", y="count",
+            labels={"bin_mid": "Age (Years)", "count": "Number of Applicants"},
+            title="Distribution of Loan Applicant Age",
+            color_discrete_sequence=["#4C72B0"]
+        )
+        fig_age_all.update_traces(marker_line_width=1.2, marker_line_color="black")
+        
+        # Smooth KDE line (coolwarm palette effect)
+        fig_age_all.add_scatter(
+            x=age_hist_all["bin_mid"], y=age_hist_all["count"],
+            mode="lines", name="Trend",
+            line=dict(color="#D55E00", width=3, shape="spline")  # Orange for coolwarm
+        )
+        
+        fig_age_all.update_layout(height=260, showlegend=False, transition_duration=0)
+        st.plotly_chart(fig_age_all)
 
 st.markdown(
     """
