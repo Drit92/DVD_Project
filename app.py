@@ -797,10 +797,10 @@ st.markdown(
 st.markdown("---")
 
 # ============================================
-# 8. INTERACTIVE RADAR CHART – RISK PROFILE COMPARISON
+# 8.  RADAR CHART – RISK PROFILE COMPARISON
 # ============================================
 
-st.header("📈 Interactive Risk Profile Comparison – Radar Chart")
+st.header("📈 Risk Profile Comparison – Radar Chart")
 
 radar_means = get_agg("radar_means", required=False)
 if radar_means.empty:
@@ -823,7 +823,7 @@ else:
     values_1 += values_1[:1]
     labels += labels[:1]
     
-    # Create interactive radar
+    # Create  radar
     fig_radar = go.Figure()
     
     # Non-defaulters (Green)
@@ -860,7 +860,7 @@ else:
             ),
         ),
         showlegend=True,
-        title="Interactive Risk Profile: Hover for Exact Values",
+        title="Risk Profile: Radar Chart",
         height=500,
         font_size=11,
         margin=dict(t=80, b=20, l=20, r=20)
