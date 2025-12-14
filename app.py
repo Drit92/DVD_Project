@@ -489,8 +489,14 @@ else:
             The curve peaks in the **middle of the stress range (2–3×)** and then falls, suggesting a **non‑linear relationship** where borrowers with moderate financial stress can be riskier than those at the very low or very high ends.
             """
         )
-
+        st.markdown("""
+            **Simple Explanation:**
+            - Default risk climbs from **low debt (0-1x income)** to **medium debt (2-3x income)**, hitting **8-9%**.
+            - **Surprise**: Very high debt (5x+ income) is actually **safer** than medium debt.
+            - **Why?** Moderately stressed borrowers are riskier than both safe and desperate ones.
+        """)
 st.markdown("---")
+
 
 
 # ============================================
