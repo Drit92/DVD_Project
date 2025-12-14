@@ -663,7 +663,7 @@ if not edu_ext.empty:
         st.plotly_chart(fig_heat_edu, use_container_width=True)
 
 st.markdown("""
-**Key Insights (from Colab):**
+**Key Insights :**
 - **Credit 3-5x + refusal = 14-18% default** (vs 7-9% clean history across all bands)
 - **Secondary education + Q1 score = 15%+ default** (vs 3-4% for higher education + Q4)
 - **Interactions multiply risk** – reject combinations, not just individual flags
