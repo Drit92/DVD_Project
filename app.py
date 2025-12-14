@@ -205,7 +205,6 @@ with col2:
         fig_age_all.update_layout(height=260, transition_duration=0, showlegend=False)
         st.plotly_chart(fig_age_all, width="stretch")
 
-
 st.markdown(
     """
     **Insights:**
