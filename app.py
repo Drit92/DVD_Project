@@ -663,12 +663,13 @@ if not edu_ext.empty:
         st.plotly_chart(fig_heat_edu, use_container_width=True)
 
 st.markdown("""
-**Key Insights :**
-- **Credit 3-5x + refusal = 14-18% default** (vs 7-9% clean history across all bands)
-- **Secondary education + Q1 score = 15%+ default** (vs 3-4% for higher education + Q4)
-- **Interactions multiply risk** – reject combinations, not just individual flags
+**Key Insights (Simple Terms):**
+- **High debt (3-5x income) + past rejection = 14-18% will default** (vs 7-9% for clean records)
+- **High school education + worst credit score = 15%+ will default** (vs 3-4% for college grads + best scores)
+- **Bad + bad = MUCH worse** – reject when multiple red flags appear together
 """)
 st.markdown("---")
+
 
 
 
