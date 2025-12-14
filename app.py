@@ -274,6 +274,8 @@ for col, (r, c) in demo_mapping.items():
         xaxis=dict(tickangle=-35),
         coloraxis_showscale=False,
     )
+    fig_tmp.update_traces(text=df_demo["DefaultRate"], textposition="outside", textfont=dict(size=11, color="white"))
+
 
     for trace in fig_tmp.data:
         fig_dem.add_trace(trace, row=r, col=c)
