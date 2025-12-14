@@ -113,32 +113,37 @@ with col1:
     st.plotly_chart(fig_donut, width="stretch")
 
 with col2:
-    st.subheader("Applicant Age Distribution (ALL)")
-    age_hist_all = get_agg("age_all_applicants_hist", required=False)
-    if age_hist_all.empty:
-        st.info("All-applicants age histogram not available.")
+    st.subheader("Applicant Age Distribution")
+    age_hist = get_agg("age_defaulters_hist", required=False)  # ← Use existing file
+    if age_hist.empty:
+        st.info("Age histogram aggregate not available.")
     else:
-        age_hist_all = age_hist_all.copy()
-        age_hist_all["bin_mid"] = (age_hist_all["bin_left"] + age_hist_all["bin_right"]) / 2
+        age_hist = age_hist.copy()
+        age_hist["bin_mid"] = (age_hist["bin_left"] + age_hist["bin_right"]) / 2
 
-        # Histogram + KDE-style smooth line (like seaborn)
+        # Seaborn-style histogram + smooth KDE (20 bins effect)
         fig_age_all = px.bar(
-            age_hist_all, x="bin_mid", y="count",
+            age_hist, x="bin_mid", y="count",
             labels={"bin_mid": "Age (Years)", "count": "Number of Applicants"},
             title="Distribution of Loan Applicant Age",
-            color_discrete_sequence=["#4C72B0"]
+            color_discrete_sequence=["steelblue"]  # Coolwarm blue
         )
-        fig_age_all.update_traces(marker_line_width=1.2, marker_line_color="black")
+        fig_age_all.update_traces(marker_line_width=1.5, marker_line_color="darkblue")
         
-        # Smooth KDE line (coolwarm palette effect)
+        # Smooth KDE curve (warm orange like seaborn)
         fig_age_all.add_scatter(
-            x=age_hist_all["bin_mid"], y=age_hist_all["count"],
-            mode="lines", name="Trend",
-            line=dict(color="#D55E00", width=3, shape="spline")  # Orange for coolwarm
+            x=age_hist["bin_mid"], y=age_hist["count"],
+            mode="lines", name="Smooth trend",
+            line=dict(color="#E69F00", width=4, shape="spline")  # Coolwarm orange
         )
         
-        fig_age_all.update_layout(height=260, showlegend=False, transition_duration=0)
-        st.plotly_chart(fig_age_all)
+        fig_age_all.update_layout(
+            height=280, showlegend=False, 
+            font=dict(size=11),
+            transition_duration=0
+        )
+        st.plotly_chart(fig_age_all, use_container_width=True)
+
 
 st.markdown(
     """
