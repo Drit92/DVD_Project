@@ -795,7 +795,6 @@ st.markdown(
     """
 )
 st.markdown("---")
-
 # ============================================
 # 8. RADAR CHART – RISK PROFILE COMPARISON
 # ============================================
@@ -857,33 +856,30 @@ else:
                 range=[0, 1],
                 tickvals=[0, 0.25, 0.5, 0.75, 1],
                 ticktext=['0', '0.25', '0.5', '0.75', '1'],
-                tickfont=dict(size=14, color="black", family="Arial Black"),
-                gridcolor="black",
-                gridwidth=2
+                tickfont=dict(size=12, color="#333333"),  # Dark gray
+                gridcolor="#666666",  # Dark gray grids
+                gridwidth=1.5
             ),
             angularaxis=dict(
-                tickfont=dict(size=13, color="black", family="Arial Black", weight="bold")
+                tickfont=dict(size=11, color="#333333"),  # Dark gray labels
+                linecolor="#999999"  # Dark gray angular lines
             )
         ),
         showlegend=True,
         title=dict(
             text="Interactive Risk Profile: Hover for Exact Values",
-            font=dict(size=18, color="black", family="Arial Black", weight="bold")
+            font=dict(size=16, color="#333333")  # Dark title
         ),
         height=500,
-        font=dict(size=12, color="black", family="Arial Black"),
-        font_family="Arial Black",
-        margin=dict(t=100, b=20, l=40, r=40),
+        font=dict(size=11, color="#333333"),  # Dark throughout
+        margin=dict(t=80, b=20, l=40, r=40),
         legend=dict(
-            font=dict(size=12, color="black", family="Arial Black"),
-            bgcolor="rgba(255,255,255,0.9)",
-            bordercolor="black",
-            borderwidth=2
+            font=dict(size=11, color="#333333"),
+            bgcolor="rgba(255,255,255,0.95)"
         ),
         hoverlabel=dict(
-            bgcolor="black",
-            font_size=14,
-            font_family="Arial Black",
+            bgcolor="#444444",      # Dark gray hover
+            font_size=12,
             font_color="white"
         )
     )
@@ -895,6 +891,7 @@ st.markdown(
 **Insight:** The red shape (defaulters) bulges where debt burdens and refusals are higher and external scores weaker, while the green shape (non‑defaulters) shows lower leverage and stronger scores.
 """
 )
+
 
 
 
