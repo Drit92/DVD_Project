@@ -163,80 +163,56 @@ st.markdown("---")
 
 
 # ============================================
-# 1A. BORROWER PROFILES – GENDER & AGE
+# 1. PORTFOLIO OVERVIEW – WHO DEFAULTS?
 # ============================================
 
-st.header("🧍 Borrower Profiles – Who Applies?")
+st.header("📈 Portfolio Overview – Who Defaults?")
 
-col1, col2 = st.columns(2)
+col1, col2 = st.columns([1, 2])
 
 with col1:
-    st.subheader("Applicant Gender Mix")
-    gender_mix = get_agg("gender_mix", required=False)
-    if gender_mix.empty:
-        st.info("Gender mix aggregate not available.")
-    else:
-        label_map = {"M": "Male", "F": "Female"}
-        gender_mix["Label"] = gender_mix["CODE_GENDER"].map(label_map).fillna(
-            gender_mix["CODE_GENDER"]
-        )
-
-        fig_gender_pie = go.Figure(
-            data=[
-                go.Pie(
-                    labels=gender_mix["Label"],
-                    values=gender_mix["Share"],
-                    hole=0.4,
-                    marker_colors=["#4C72B0", "#DD8452"],
-                    textinfo="label+percent",
-                    textposition="outside",
-                    showlegend=False,
-                )
-            ]
-        )
-        fig_gender_pie.update_layout(
-            title="Share of Applicants by Gender",
-            margin=dict(t=40, l=10, r=10, b=10),
-            height=260,
-            transition_duration=0,
-        )
-        st.plotly_chart(fig_gender_pie, width="stretch")
+    labels = ["Good borrower (0)", "Defaulter (1)"]
+    shares = [
+        float(target_dist.loc[target_dist["TARGET"] == 0, "Share"].values[0]),
+        float(target_dist.loc[target_dist["TARGET"] == 1, "Share"].values[0]),
+    ]
+    fig_donut = go.Figure(
+        data=[
+            go.Pie(
+                labels=labels,
+                values=shares,
+                hole=0.6,
+                marker_colors=["#28a745", "#dc3545"],
+                textinfo="label+percent",
+                textposition="outside",
+                showlegend=False,
+            )
+        ]
+    )
+    fig_donut.update_layout(
+        title=dict(text="Share of Good Borrowers vs Defaulters", y=0.96),
+        height=260,
+        margin=dict(t=80, b=10, l=10, r=10),
+        transition_duration=0,
+    )
+    st.plotly_chart(fig_donut, width="stretch")  # ← FIXED: removed extra True)
 
 with col2:
-    st.subheader("Applicant Age Distribution (Defaulters Approx.)")
-    age_hist = get_agg("age_defaulters_hist", required=False)
-    if age_hist.empty:
-        st.info("Age histogram aggregate not available.")
-    else:
-        age_hist = age_hist.copy()
-        age_hist["bin_mid"] = (age_hist["bin_left"] + age_hist["bin_right"]) / 2
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total Applications", f"{total_applicants:,}")
+    c2.metric(
+        "Total Defaulters",
+        f"{total_defaulters:,}",
+        f"{default_rate_overall:.1%}",
+    )
+    c3.metric("Total Good Borrowers", f"{total_good:,}")
 
-        # Base histogram (binned bar chart)
-        fig_age_all = px.bar(
-            age_hist,
-            x="bin_mid",
-            y="count",
-            labels={
-                "bin_mid": "Age (years)",
-                "count": "Number of defaulters (binned)",
-            },
-            title="Distribution of Loan Applicant Age (Defaulters Approx.)",
-            color_discrete_sequence=["#4C72B0"],
-        )
-        fig_age_all.update_traces(marker_line_width=1.2, marker_line_color="black")
-
-        # Smooth trendline using the same binned data
-        fig_age_all.add_scatter(
-            x=age_hist["bin_mid"],
-            y=age_hist["count"],
-            mode="lines",
-            name="Smoothed trend",
-            line=dict(color="crimson", width=2, shape="spline"),
-        )
-
-        fig_age_all.update_layout(height=260, transition_duration=0, showlegend=False)
-        st.plotly_chart(fig_age_all, width="stretch")
-
+st.markdown(
+    """
+    **Overview story:** Most customers repay on time; only a small share (about 8%) default, so the dataset is highly imbalanced.
+    """
+)
+st.markdown("---")
 
 st.markdown(
     """
