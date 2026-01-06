@@ -14,3 +14,6 @@ The dashboard helps analyze:
 
 **Dashboard Link:**
 https://dvdproject-m2yezvyziwz3hirfq6uxnh.streamlit.app/
+
+Project Problem Statement:
+https://docs.google.com/document/d/e/2PACX-1vRulqNoM-3w5jVHkw2jLdfgWb56bZ01XEofia2-ZPB5q8b0iFPJjjkuBMWz2pXyZ1TOvzvXrb8NbsSB/pub
