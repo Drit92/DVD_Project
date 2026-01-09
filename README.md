@@ -9,7 +9,7 @@ The dashboard helps analyze:
 - Demographic patterns  
 - Family structure  
 - External stability scores  
-- Cluster personas (if available)  
+- Cluster personas 
 - Correlation insights  
 
 **Dashboard Link:**
